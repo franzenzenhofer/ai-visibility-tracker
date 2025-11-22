@@ -69,9 +69,6 @@ target_domain = "marktguru.at"
 # User location (MOST IMPORTANT! Provides geographic context)
 user_location = "Vienna, Austria"
 
-# Processing settings
-batch_size = 2
-
 # AI models to use
 model_openai = "gpt-5-mini"
 model_gemini = "gemini-2.5-flash"
@@ -126,7 +123,6 @@ Process queries from an Excel file and analyze AI visibility.
 | `-d, --domain <domain>` | Target domain to track | From config |
 | `-l, --location <location>` | User location | From config |
 | `--language <lang>` | Language for persona prompts (ISO 639-1: en, de, es, fr, etc.) | From config |
-| `-b, --batch <size>` | Batch size (concurrent processing) | From config |
 | `--skip <lines>` | Skip first N lines from Excel file | `0` |
 | `--count <number>` | Number of queries to process | `3` |
 | `-n, --limit <count>` | DEPRECATED: Use --count instead | `0` |
@@ -235,7 +231,6 @@ Human-readable TOML configuration containing:
 **Settings:**
 - `target_domain` - Domain to track
 - `user_location` - Geographic context (CRITICAL!)
-- `batch_size` - Parallel processing
 - `model_openai` - OpenAI model name
 - `model_gemini` - Gemini model name
 
@@ -429,9 +424,9 @@ npm run lint:fix
 ### Rate Limits
 
 If you hit rate limits:
-- Reduce `batch_size` in config.toml
-- Use `--limit` to process fewer queries
+- Use `--count` to process fewer queries at a time
 - Add longer delays (modify `src/processor.ts`)
+- Process in smaller batches
 
 ### Excel File Issues
 
