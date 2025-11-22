@@ -1,0 +1,189 @@
+"use strict";
+/**
+ * Main processor for AI visibility tracking
+ */
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.VisibilityProcessor = void 0;
+const p_queue_1 = __importDefault(require("p-queue"));
+const openai_client_1 = require("./openai-client");
+const gemini_client_1 = require("./gemini-client");
+const utils_1 = require("./utils");
+const constants_1 = require("./constants");
+class VisibilityProcessor {
+    constructor(config) {
+        this.config = config;
+        this.openaiClient = new openai_client_1.OpenAIClient(config);
+        this.geminiClient = new gemini_client_1.GeminiClient(config);
+        this.queue = new p_queue_1.default({
+            concurrency: constants_1.PROCESSING_CONSTANTS.QUEUE_CONCURRENCY,
+        });
+        this.stats = {
+            total: 0,
+            processed: 0,
+            visible: 0,
+            invisible: 0,
+            toolOnly: 0,
+            errors: 0,
+        };
+    }
+    /**
+     * Process all queries
+     */
+    async processQueries(queries, onProgress) {
+        this.stats.total = queries.length;
+        const results = [];
+        for (let i = 0; i < queries.length; i++) {
+            const query = queries[i];
+            if (onProgress) {
+                onProgress(i + 1, queries.length, query.query);
+            }
+            try {
+                const result = await this.processQuery(query);
+                results.push(result);
+                this.updateStats(result);
+            }
+            catch (error) {
+                console.error(`Error processing query "${query.query}":`, error);
+                results.push(this.createErrorResult(query.query));
+                this.stats.errors++;
+            }
+            // Rate limiting delay
+            await (0, utils_1.sleep)(constants_1.PROCESSING_CONSTANTS.RATE_LIMIT_DELAY_MS);
+        }
+        return results;
+    }
+    /**
+     * Process a single query
+     *
+     * @param queryRow - Query row to process
+     * @returns Processed result with all variant responses
+     */
+    async processQuery(queryRow) {
+        const { query } = queryRow;
+        // Step 1: Generate persona
+        const persona = await this.openaiClient.generatePersona(query);
+        if (!persona) {
+            return this.createErrorResult(query, 'Failed to generate persona');
+        }
+        // Step 2: Parallel matrix queries (4 variants)
+        const [gptNoTool, gptWithTool, gemNoGrounding, gemWithGrounding] = await Promise.all([
+            this.openaiClient.queryWithoutTools(persona),
+            this.openaiClient.queryWithTools(persona),
+            this.geminiClient.queryWithoutGrounding(persona),
+            this.geminiClient.queryWithGrounding(persona),
+        ]);
+        // Step 3: Analyze results
+        const targetDomain = this.config.TARGET_DOMAIN.toLowerCase();
+        const findRank = (results) => {
+            if (!results || results.length === 0) {
+                return { rank: '-', url: '-' };
+            }
+            const found = results.find(r => r.domain.includes(targetDomain) || r.url.includes(targetDomain));
+            if (found) {
+                return { rank: found.rank, url: found.url };
+            }
+            return { rank: '-', url: '-' };
+        };
+        const r1 = findRank(gptNoTool);
+        const r2 = findRank(gptWithTool);
+        const r3 = findRank(gemNoGrounding);
+        const r4 = findRank(gemWithGrounding);
+        // Step 4: Determine status
+        let status = constants_1.RESULT_STATUS.INVISIBLE;
+        // Check if all APIs failed
+        if (!gptNoTool && !gptWithTool && !gemNoGrounding && !gemWithGrounding) {
+            status = constants_1.RESULT_STATUS.ERROR;
+        }
+        else if (r1.rank !== '-' ||
+            r2.rank !== '-' ||
+            r3.rank !== '-' ||
+            r4.rank !== '-') {
+            status = constants_1.RESULT_STATUS.VISIBLE;
+            // Check if only visible with tools
+            if (r1.rank === '-' &&
+                r3.rank === '-' &&
+                (r2.rank !== '-' || r4.rank !== '-')) {
+                status = constants_1.RESULT_STATUS.TOOL_ONLY;
+            }
+        }
+        return {
+            originalQuery: query,
+            personaPrompt: persona,
+            status,
+            // Store all results
+            gptNoToolResults: gptNoTool || [],
+            gptWithToolResults: gptWithTool || [],
+            gemNoGroundingResults: gemNoGrounding || [],
+            gemWithGroundingResults: gemWithGrounding || [],
+            // Legacy fields for CSV compatibility
+            gptRank: r1.rank,
+            gptUrl: r1.url,
+            gptRankWeb: r2.rank,
+            gptUrlWeb: r2.url,
+            gemRank: r3.rank,
+            gemUrl: r3.url,
+            gemRankWeb: r4.rank,
+            gemUrlWeb: r4.url,
+        };
+    }
+    /**
+     * Create error result when processing fails
+     *
+     * @param query - Original query that failed
+     * @param reason - Error reason/message
+     * @returns Error result with empty data
+     */
+    createErrorResult(query, reason = 'Processing error') {
+        return {
+            originalQuery: query,
+            personaPrompt: reason,
+            status: constants_1.RESULT_STATUS.ERROR,
+            gptNoToolResults: [],
+            gptWithToolResults: [],
+            gemNoGroundingResults: [],
+            gemWithGroundingResults: [],
+            gptRank: '-',
+            gptUrl: '-',
+            gptRankWeb: '-',
+            gptUrlWeb: '-',
+            gemRank: '-',
+            gemUrl: '-',
+            gemRankWeb: '-',
+            gemUrlWeb: '-',
+        };
+    }
+    /**
+     * Update processing statistics based on result
+     *
+     * @param result - Processed result to count
+     */
+    updateStats(result) {
+        this.stats.processed++;
+        switch (result.status) {
+            case constants_1.RESULT_STATUS.VISIBLE:
+                this.stats.visible++;
+                break;
+            case constants_1.RESULT_STATUS.INVISIBLE:
+                this.stats.invisible++;
+                break;
+            case constants_1.RESULT_STATUS.TOOL_ONLY:
+                this.stats.toolOnly++;
+                break;
+            case constants_1.RESULT_STATUS.ERROR:
+                this.stats.errors++;
+                break;
+        }
+    }
+    /**
+     * Get current processing statistics
+     *
+     * @returns Copy of current statistics
+     */
+    getStats() {
+        return { ...this.stats };
+    }
+}
+exports.VisibilityProcessor = VisibilityProcessor;
