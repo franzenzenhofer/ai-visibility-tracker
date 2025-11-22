@@ -451,6 +451,31 @@
     }
 
     async function processAllRemaining() {
+      // Safety check: require at least 3 processed queries
+      if (processedQueries < 3) {
+        alert(`⚠️ Please process at least 3 queries first before using "Do All".\n\nCurrently processed: ${processedQueries}/3`);
+        logger.log('info', `⛔ Do All blocked: only ${processedQueries}/3 queries processed`);
+        return;
+      }
+
+      const remaining = totalQueries - processedQueries;
+
+      // Confirmation dialog with strong warning
+      const confirmed = confirm(
+        `⚠️ ARE YOU SURE?\n\n` +
+        `You are about to process ${remaining} queries!\n\n` +
+        `This will:\n` +
+        `• Take a LONG time to complete\n` +
+        `• Cost significant API credits\n` +
+        `• Cannot be easily stopped once started\n\n` +
+        `Do you really want to continue?`
+      );
+
+      if (!confirmed) {
+        logger.log('info', '⛔ User cancelled "Do All Remaining" operation');
+        return;
+      }
+
       logger.log('info', `⚡ Processing all remaining queries: ${processedQueries} → ${totalQueries}`);
 
       // Set limit to total
@@ -562,6 +587,19 @@
           document.getElementById('nextBatchSize').textContent = nextBatch;
           document.getElementById('remainingCount').textContent = remaining;
           document.getElementById('batchControls').classList.remove('hidden');
+
+          // Enable "Do All" button only if we've processed at least 3 queries
+          const doAllBtn = document.getElementById('doAllBtn');
+          if (processedQueries >= 3) {
+            doAllBtn.disabled = false;
+            doAllBtn.style.opacity = '1';
+            doAllBtn.style.cursor = 'pointer';
+          } else {
+            doAllBtn.disabled = true;
+            doAllBtn.style.opacity = '0.5';
+            doAllBtn.style.cursor = 'not-allowed';
+            doAllBtn.title = `Process at least 3 queries first (${processedQueries}/3 done)`;
+          }
 
           document.getElementById('progressText').textContent =
             `Batch complete! ${remaining} queries remaining`;
