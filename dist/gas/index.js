@@ -156,13 +156,14 @@ function runErrorsAgain() {
         PropertiesService.getScriptProperties().deleteProperty('RUN_CANCEL');
         let done = 0;
         let errors = 0;
+        const prompts = (0, sheet_utils_1.readPrompts)();
         errorRows.forEach(({ row, idx }) => {
             if (shouldCancel())
                 throw new Error('Run cancelled');
             const query = row[0];
             try {
                 (0, sheet_utils_1.setRowStatus)(rSheet, idx + 2, 'processing');
-                const processed = (0, pipeline_1.processRow)(String(query), cfg, idx + 2);
+                const processed = (0, pipeline_1.processRow)(String(query), cfg, idx + 2, prompts);
                 (0, sheet_utils_1.writeRow)(rSheet, idx + 2, [
                     query,
                     processed.personaPrompt,
@@ -255,6 +256,7 @@ function factoryResetKeepKeys() {
     fullRestart();
     clearLogs();
     (0, sheet_utils_1.resetSettingsSheet)();
+    (0, sheet_utils_1.resetPromptsSheet)();
     (0, sheet_utils_1.writeLog)('INFO', 'Factory reset (keep keys) executed');
 }
 function factoryResetAll() {
@@ -265,6 +267,7 @@ function factoryResetAll() {
     fullRestart();
     clearLogs();
     (0, sheet_utils_1.resetSettingsSheet)();
+    (0, sheet_utils_1.resetPromptsSheet)();
     const props = PropertiesService.getScriptProperties();
     props.deleteProperty('OPENAI_API_KEY');
     props.deleteProperty('GEMINI_API_KEY');

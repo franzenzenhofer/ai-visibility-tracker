@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.cityFromLocation = exports.validateConfig = exports.getCountryOptions = exports.getLanguageOptions = exports.ensureConfigReady = exports.seedResultsFromQueries = exports.findQueryColumn = exports.findDataSheet = exports.setRowStatus = exports.writeRow = exports.buildEmptyRow = exports.normalizeOutputRow = exports.writeLog = exports.readSettings = exports.resetSettingsSheet = exports.ensureSheets = exports.OUTPUT_HEADERS = exports.SHEETS = void 0;
+exports.cityFromLocation = exports.validateConfig = exports.getCountryOptions = exports.getLanguageOptions = exports.ensureConfigReady = exports.seedResultsFromQueries = exports.findQueryColumn = exports.findDataSheet = exports.setRowStatus = exports.writeRow = exports.buildEmptyRow = exports.normalizeOutputRow = exports.writeLog = exports.readPrompts = exports.readSettings = exports.resetPromptsSheet = exports.resetSettingsSheet = exports.ensureSheets = exports.OUTPUT_HEADERS = exports.SHEETS = void 0;
 const config_1 = require("./generated/config");
 const constants_1 = require("../constants");
 const utils_1 = require("../utils");
@@ -9,6 +9,7 @@ exports.SHEETS = {
     RESULTS: 'Results',
     SETTINGS: 'Settings',
     LOGS: 'Logs',
+    PROMPTS: 'Prompts',
 };
 exports.OUTPUT_HEADERS = [
     'Original Query',
@@ -61,6 +62,12 @@ const ensureSheets = () => {
     if (logs.getLastRow() === 0) {
         logs.getRange(1, 1, 1, 3).setValues([['Timestamp', 'Level', 'Message']]);
     }
+    const prompts = ss.getSheetByName(exports.SHEETS.PROMPTS);
+    if (prompts.getLastRow() === 0) {
+        prompts.getRange(1, 1, 1, 3).setValues([['Key', 'Prompt', 'Notes']]);
+        const rows = Object.entries(config_1.DEFAULT_PROMPTS).map(([k, v]) => [k, v, 'Edit to override default prompt']);
+        prompts.getRange(2, 1, rows.length, 3).setValues(rows);
+    }
 };
 exports.ensureSheets = ensureSheets;
 const resetSettingsSheet = () => {
@@ -81,6 +88,15 @@ const resetSettingsSheet = () => {
     settings.getRange(2, 1, rows.length, 3).setValues(rows);
 };
 exports.resetSettingsSheet = resetSettingsSheet;
+const resetPromptsSheet = () => {
+    const ss = SpreadsheetApp.getActive();
+    const prompts = ss.getSheetByName(exports.SHEETS.PROMPTS);
+    prompts.clear();
+    prompts.getRange(1, 1, 1, 3).setValues([['Key', 'Prompt', 'Notes']]);
+    const rows = Object.entries(config_1.DEFAULT_PROMPTS).map(([k, v]) => [k, v, 'Edit to override default prompt']);
+    prompts.getRange(2, 1, rows.length, 3).setValues(rows);
+};
+exports.resetPromptsSheet = resetPromptsSheet;
 const readSettings = () => {
     const ss = SpreadsheetApp.getActive();
     const settings = ss.getSheetByName(exports.SHEETS.SETTINGS);
@@ -106,6 +122,23 @@ const readSettings = () => {
     };
 };
 exports.readSettings = readSettings;
+const readPrompts = () => {
+    const ss = SpreadsheetApp.getActive();
+    const promptsSheet = ss.getSheetByName(exports.SHEETS.PROMPTS);
+    if (!promptsSheet)
+        return { ...config_1.DEFAULT_PROMPTS };
+    const rows = promptsSheet
+        .getRange(2, 1, Math.max(promptsSheet.getLastRow() - 1, 0), 2)
+        .getValues();
+    const map = { ...config_1.DEFAULT_PROMPTS };
+    rows.forEach(([k, v]) => {
+        if (!k)
+            return;
+        map[String(k).trim()] = typeof v === 'string' ? v : String(v || '');
+    });
+    return map;
+};
+exports.readPrompts = readPrompts;
 const writeLog = (level, message) => {
     const sheet = SpreadsheetApp.getActive().getSheetByName(exports.SHEETS.LOGS);
     sheet.appendRow([new Date(), level, message]);

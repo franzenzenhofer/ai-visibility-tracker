@@ -4,11 +4,14 @@ export declare const SHEETS: {
     readonly RESULTS: "Results";
     readonly SETTINGS: "Settings";
     readonly LOGS: "Logs";
+    readonly PROMPTS: "Prompts";
 };
 export declare const OUTPUT_HEADERS: readonly ["Original Query", "Persona Prompt", "Visibility Status", "Check Status", "GPT Rank", "GPT URL", "GPT Rank (Web)", "GPT URL (Web)", "Gemini Rank", "Gemini URL", "Gemini Rank (Web)", "Gemini URL (Web)", "GPT NoTools (all URLs)", "GPT Web (all URLs)", "Gemini No (all URLs)", "Gemini Web (all URLs)", "Error"];
 export declare const ensureSheets: () => void;
 export declare const resetSettingsSheet: () => void;
+export declare const resetPromptsSheet: () => void;
 export declare const readSettings: () => GasConfig;
+export declare const readPrompts: () => Record<string, string>;
 export declare const writeLog: (level: "INFO" | "WARN" | "ERROR", message: string) => void;
 export declare const normalizeOutputRow: (row: Array<string | number>) => Array<string | number>;
 export declare const buildEmptyRow: (query: string) => Array<string | number>;

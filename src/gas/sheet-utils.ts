@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS } from './generated/config';
+import { DEFAULT_SETTINGS, DEFAULT_PROMPTS } from './generated/config';
 import { RESULT_STATUS, PROCESSING_CONSTANTS, LOCATION_CONFIG } from '../constants';
 import { isQueryLike } from '../utils';
 import { GasConfig } from './models';
@@ -8,6 +8,7 @@ export const SHEETS = {
   RESULTS: 'Results',
   SETTINGS: 'Settings',
   LOGS: 'Logs',
+  PROMPTS: 'Prompts',
 } as const;
 
 export const OUTPUT_HEADERS = [
@@ -66,6 +67,13 @@ export const ensureSheets = (): void => {
   if (logs.getLastRow() === 0) {
     logs.getRange(1, 1, 1, 3).setValues([['Timestamp', 'Level', 'Message']]);
   }
+
+  const prompts = ss.getSheetByName(SHEETS.PROMPTS);
+  if (prompts.getLastRow() === 0) {
+    prompts.getRange(1, 1, 1, 3).setValues([['Key', 'Prompt', 'Notes']]);
+    const rows = Object.entries(DEFAULT_PROMPTS).map(([k, v]) => [k, v, 'Edit to override default prompt']);
+    prompts.getRange(2, 1, rows.length, 3).setValues(rows);
+  }
 };
 
 export const resetSettingsSheet = (): void => {
@@ -84,6 +92,15 @@ export const resetSettingsSheet = (): void => {
     ['RATE_LIMIT_MS', 500, 'Delay between rows'],
   ];
   settings.getRange(2, 1, rows.length, 3).setValues(rows);
+};
+
+export const resetPromptsSheet = (): void => {
+  const ss = SpreadsheetApp.getActive();
+  const prompts = ss.getSheetByName(SHEETS.PROMPTS);
+  prompts.clear();
+  prompts.getRange(1, 1, 1, 3).setValues([['Key', 'Prompt', 'Notes']]);
+  const rows = Object.entries(DEFAULT_PROMPTS).map(([k, v]) => [k, v, 'Edit to override default prompt']);
+  prompts.getRange(2, 1, rows.length, 3).setValues(rows);
 };
 
 export const readSettings = (): GasConfig => {
@@ -111,6 +128,21 @@ export const readSettings = (): GasConfig => {
     batchSize: Number(map.get('BATCH_SIZE') || 5),
     rateLimitMs: Number(map.get('RATE_LIMIT_MS') || 500),
   };
+};
+
+export const readPrompts = (): Record<string, string> => {
+  const ss = SpreadsheetApp.getActive();
+  const promptsSheet = ss.getSheetByName(SHEETS.PROMPTS);
+  if (!promptsSheet) return { ...DEFAULT_PROMPTS };
+  const rows = promptsSheet
+    .getRange(2, 1, Math.max(promptsSheet.getLastRow() - 1, 0), 2)
+    .getValues() as Array<[string, string]>;
+  const map = { ...DEFAULT_PROMPTS } as Record<string, string>;
+  rows.forEach(([k, v]) => {
+    if (!k) return;
+    map[String(k).trim()] = typeof v === 'string' ? v : String(v || '');
+  });
+  return map;
 };
 
 export const writeLog = (level: 'INFO' | 'WARN' | 'ERROR', message: string): void => {

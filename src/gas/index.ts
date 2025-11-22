@@ -20,6 +20,8 @@ import {
   writeRow,
   OUTPUT_HEADERS,
   SHEETS,
+  readPrompts,
+  resetPromptsSheet,
 } from './sheet-utils';
 import { processBatch, processRow } from './pipeline';
 
@@ -186,12 +188,13 @@ function runErrorsAgain(): void {
 
     let done = 0;
     let errors = 0;
+    const prompts = readPrompts();
     errorRows.forEach(({ row, idx }) => {
       if (shouldCancel()) throw new Error('Run cancelled');
       const query = row[0] as string;
       try {
         setRowStatus(rSheet, idx + 2, 'processing');
-        const processed = processRow(String(query), cfg, idx + 2);
+        const processed = processRow(String(query), cfg, idx + 2, prompts);
         writeRow(rSheet, idx + 2, [
           query,
           processed.personaPrompt,
@@ -286,6 +289,7 @@ function factoryResetKeepKeys(): void {
   fullRestart();
   clearLogs();
   resetSettingsSheet();
+  resetPromptsSheet();
   writeLog('INFO', 'Factory reset (keep keys) executed');
 }
 
@@ -296,6 +300,7 @@ function factoryResetAll(): void {
   fullRestart();
   clearLogs();
   resetSettingsSheet();
+  resetPromptsSheet();
   const props = PropertiesService.getScriptProperties();
   props.deleteProperty('OPENAI_API_KEY');
   props.deleteProperty('GEMINI_API_KEY');
