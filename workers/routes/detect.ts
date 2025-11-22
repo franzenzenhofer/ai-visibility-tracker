@@ -28,7 +28,7 @@ export const handleDetect = async (req: Request): Promise<Response> => {
       success: true,
       detected: {
         targetDomain: detected.targetDomain || '',
-        userLocation: detected.userLocation || '',
+        userLocation: detected.location || '',
         language: detected.language || 'en',
       },
       totalQueries: queries.length,

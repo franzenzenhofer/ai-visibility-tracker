@@ -3,10 +3,10 @@
  * 59 lines - compliant with ≤75 rule (refactored)
  */
 
-import { Config, ProcessedResult, QueryRow } from '../../src/types';
+import { Config, ProcessedResult, QueryRow, ResultStatus } from '../../src/types';
 import { OpenAIClient } from '../../src/openai-client';
 import { GeminiClient } from '../../src/gemini-client';
-import { normalizeDomain } from '../../src/utils';
+import { normalizeDomain } from '../../src/domain-utils';
 import { RESULT_STATUS } from '../../src/constants';
 import { sendStep } from '../sse/events';
 import { findRank, determineStatus } from '../utils/ranking';
@@ -42,7 +42,7 @@ export const processQuery = async (
   const gemWeb = findRank(gemWithGround, targetDomain);
 
   const hasError = !gptNoTool && !gptWithTool && !gemNoGround && !gemWithGround;
-  const status = determineStatus(gpt.rank, gem.rank, gptWeb.rank, gemWeb.rank, hasError, RESULT_STATUS);
+  const status = determineStatus(gpt.rank, gem.rank, gptWeb.rank, gemWeb.rank, hasError, RESULT_STATUS) as ResultStatus;
 
   await sendStep(writer, 'status', { status });
 

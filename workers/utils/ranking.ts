@@ -4,7 +4,7 @@
  */
 
 import { SerpResult } from '../../src/types';
-import { normalizeDomain, extractDomainFromUrl } from '../../src/utils';
+import { normalizeDomain, extractDomainFromUrl } from '../../src/domain-utils';
 
 export const findRank = (results: SerpResult[], targetDomain: string) => {
   const match = results.find((r) => {

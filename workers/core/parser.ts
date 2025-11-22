@@ -5,9 +5,8 @@
 
 import * as XLSX from 'xlsx';
 import { QueryRow } from '../../src/types';
-import { GSC_HEADERS } from '../../src/config';
-import { isQueryLike } from '../../src/utils';
-import { PROCESSING_CONSTANTS } from '../../src/constants';
+import { GSC_HEADERS, PROCESSING_CONSTANTS } from '../../src/constants';
+import { isQueryLike } from '../../src/query-utils';
 
 const isQueryColumn = (data: Record<string, unknown>[], col: string): boolean => {
   const samples = Math.min(PROCESSING_CONSTANTS.QUERY_DETECTION_SAMPLE_SIZE, data.length);

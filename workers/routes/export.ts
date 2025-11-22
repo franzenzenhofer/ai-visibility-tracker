@@ -10,7 +10,8 @@ import { buildJSONResponse } from '../export/json';
 
 export const handleExport = async (req: Request): Promise<Response> => {
   try {
-    const { results, format } = await req.json();
+    const body = await req.json() as { results?: unknown; format?: string };
+    const { results, format } = body;
 
     if (!results || !Array.isArray(results)) {
       return Response.json({ error: 'Invalid results' }, { status: 400 });

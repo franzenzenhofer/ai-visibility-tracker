@@ -5,7 +5,7 @@
 
 import * as XLSX from 'xlsx';
 import { QueryRow } from './types';
-import { GSC_HEADERS } from './config';
+import { GSC_HEADERS } from './constants';
 import { findGSCSheet, findQueryColumn } from './sheet-detector';
 
 export const readExcelFile = (filePath: string): QueryRow[] => {

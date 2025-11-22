@@ -3,7 +3,7 @@
  */
 
 import * as XLSX from 'xlsx';
-import { GSC_HEADERS } from './config';
+import { GSC_HEADERS } from './constants';
 import { isQueryLike } from './query-utils';
 import { PROCESSING_CONSTANTS } from './constants';
 
@@ -51,7 +51,7 @@ export const findGSCSheet = (workbook: XLSX.WorkBook): string | null => {
     const headers = Object.keys(data[0]).map(h => h.toLowerCase());
 
     // Check if this sheet has GSC-like headers
-    const hasGSCHeaders = GSC_HEADERS.some(gscHeader =>
+    const hasGSCHeaders = GSC_HEADERS.some((gscHeader: string) =>
       headers.some(h => h.includes(gscHeader.toLowerCase()) || gscHeader.toLowerCase().includes(h))
     );
 
