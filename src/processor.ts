@@ -3,9 +3,17 @@
  */
 
 import PQueue from 'p-queue';
-import { Config, QueryRow, ProcessedResult, ProcessingStats, SerpResult } from './types';
+import {
+  Config,
+  QueryRow,
+  ProcessedResult,
+  ProcessingStats,
+  SerpResult,
+} from './types';
 import { OpenAIClient } from './openai-client';
 import { GeminiClient } from './gemini-client';
+import { sleep } from './utils';
+import { PROCESSING_CONSTANTS, RESULT_STATUS, ResultStatus } from './constants';
 
 export class VisibilityProcessor {
   private config: Config;
@@ -18,7 +26,9 @@ export class VisibilityProcessor {
     this.config = config;
     this.openaiClient = new OpenAIClient(config);
     this.geminiClient = new GeminiClient(config);
-    this.queue = new PQueue({ concurrency: 3 }); // Limit concurrent API calls
+    this.queue = new PQueue({
+      concurrency: PROCESSING_CONSTANTS.QUEUE_CONCURRENCY,
+    });
     this.stats = {
       total: 0,
       processed: 0,
@@ -57,7 +67,7 @@ export class VisibilityProcessor {
       }
 
       // Rate limiting delay
-      await this.sleep(500);
+      await sleep(PROCESSING_CONSTANTS.RATE_LIMIT_DELAY_MS);
     }
 
     return results;
@@ -65,6 +75,9 @@ export class VisibilityProcessor {
 
   /**
    * Process a single query
+   *
+   * @param queryRow - Query row to process
+   * @returns Processed result with all variant responses
    */
   private async processQuery(queryRow: QueryRow): Promise<ProcessedResult> {
     const { query } = queryRow;
@@ -76,17 +89,20 @@ export class VisibilityProcessor {
     }
 
     // Step 2: Parallel matrix queries (4 variants)
-    const [gptNoTool, gptWithTool, gemNoGrounding, gemWithGrounding] = await Promise.all([
-      this.openaiClient.queryWithoutTools(persona),
-      this.openaiClient.queryWithTools(persona),
-      this.geminiClient.queryWithoutGrounding(persona),
-      this.geminiClient.queryWithGrounding(persona),
-    ]);
+    const [gptNoTool, gptWithTool, gemNoGrounding, gemWithGrounding] =
+      await Promise.all([
+        this.openaiClient.queryWithoutTools(persona),
+        this.openaiClient.queryWithTools(persona),
+        this.geminiClient.queryWithoutGrounding(persona),
+        this.geminiClient.queryWithGrounding(persona),
+      ]);
 
     // Step 3: Analyze results
     const targetDomain = this.config.TARGET_DOMAIN.toLowerCase();
 
-    const findRank = (results: SerpResult[] | null): { rank: number | string; url: string } => {
+    const findRank = (
+      results: SerpResult[] | null
+    ): { rank: number | string; url: string } => {
       if (!results || results.length === 0) {
         return { rank: '-', url: '-' };
       }
@@ -108,17 +124,26 @@ export class VisibilityProcessor {
     const r4 = findRank(gemWithGrounding);
 
     // Step 4: Determine status
-    let status: 'visible' | 'invisible' | 'tool-only' | 'error' = 'invisible';
+    let status: ResultStatus = RESULT_STATUS.INVISIBLE;
 
     // Check if all APIs failed
     if (!gptNoTool && !gptWithTool && !gemNoGrounding && !gemWithGrounding) {
-      status = 'error';
-    } else if (r1.rank !== '-' || r2.rank !== '-' || r3.rank !== '-' || r4.rank !== '-') {
-      status = 'visible';
+      status = RESULT_STATUS.ERROR as ResultStatus;
+    } else if (
+      r1.rank !== '-' ||
+      r2.rank !== '-' ||
+      r3.rank !== '-' ||
+      r4.rank !== '-'
+    ) {
+      status = RESULT_STATUS.VISIBLE as ResultStatus;
 
       // Check if only visible with tools
-      if ((r1.rank === '-' && r3.rank === '-') && (r2.rank !== '-' || r4.rank !== '-')) {
-        status = 'tool-only';
+      if (
+        r1.rank === '-' &&
+        r3.rank === '-' &&
+        (r2.rank !== '-' || r4.rank !== '-')
+      ) {
+        status = RESULT_STATUS.TOOL_ONLY as ResultStatus;
       }
     }
 
@@ -144,13 +169,20 @@ export class VisibilityProcessor {
   }
 
   /**
-   * Create error result
+   * Create error result when processing fails
+   *
+   * @param query - Original query that failed
+   * @param reason - Error reason/message
+   * @returns Error result with empty data
    */
-  private createErrorResult(query: string, reason: string = 'Processing error'): ProcessedResult {
+  private createErrorResult(
+    query: string,
+    reason: string = 'Processing error'
+  ): ProcessedResult {
     return {
       originalQuery: query,
       personaPrompt: reason,
-      status: 'error',
+      status: RESULT_STATUS.ERROR as ResultStatus,
       gptNoToolResults: [],
       gptWithToolResults: [],
       gemNoGroundingResults: [],
@@ -167,38 +199,35 @@ export class VisibilityProcessor {
   }
 
   /**
-   * Update statistics
+   * Update processing statistics based on result
+   *
+   * @param result - Processed result to count
    */
   private updateStats(result: ProcessedResult): void {
     this.stats.processed++;
 
     switch (result.status) {
-      case 'visible':
+      case RESULT_STATUS.VISIBLE:
         this.stats.visible++;
         break;
-      case 'invisible':
+      case RESULT_STATUS.INVISIBLE:
         this.stats.invisible++;
         break;
-      case 'tool-only':
+      case RESULT_STATUS.TOOL_ONLY:
         this.stats.toolOnly++;
         break;
-      case 'error':
+      case RESULT_STATUS.ERROR:
         this.stats.errors++;
         break;
     }
   }
 
   /**
-   * Get processing statistics
+   * Get current processing statistics
+   *
+   * @returns Copy of current statistics
    */
   getStats(): ProcessingStats {
     return { ...this.stats };
-  }
-
-  /**
-   * Sleep utility
-   */
-  private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
