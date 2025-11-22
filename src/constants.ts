@@ -91,3 +91,14 @@ export const DOMAIN_PREFIXES_TO_REMOVE = ['www.'] as const;
  * URL protocols to identify
  */
 export const URL_PROTOCOLS = ['http', 'www.'] as const;
+
+/**
+ * Google Search Console header variations (multilingual)
+ */
+export const GSC_HEADERS = [
+  'Top queries',
+  'Query',
+  'Suchanfrage',
+  'Keyword',
+  'Search term',
+] as const;

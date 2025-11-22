@@ -7,16 +7,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as toml from '@iarna/toml';
 import { Config } from './types';
+import { GSC_HEADERS } from './constants';
 
 dotenv.config();
-
-export const GSC_HEADERS = [
-  'Top queries',
-  'Query',
-  'Suchanfrage',
-  'Keyword',
-  'Search term',
-];
 
 /**
  * Load configuration from TOML file and .env
