@@ -17,16 +17,25 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
-# Output files
+# Output files (generated data)
 results_*.csv
 results_*.xlsx
 results-output/
+output/
+test-results/
 
 # Test files and trash
 trash/
 test*.csv
+test*.js
+check-*.js
 *.xlsx
 !sampledata/*.xlsx
+
+# Temporary files
+*.tmp
+*.temp
+/tmp/
 
 # IDE
 .vscode/
