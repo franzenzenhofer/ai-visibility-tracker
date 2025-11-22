@@ -98,9 +98,20 @@ program
       let queries = readExcelFile(inputFile);
       console.log(`   Found ${queries.length} queries`);
 
-      // Auto-detect configuration from data if requested
-      if (options.forceConfigFromData) {
+      // Auto-detect configuration from data if:
+      // MODE 1: --force-config-from-data = FORCE detection and override ALL config values
+      // MODE 2: No flag but config has empty values = Detect ONLY missing values
+      const hasEmptyValues = !config.TARGET_DOMAIN || !config.USER_LOCATION;
+      const needsDetection = options.forceConfigFromData || hasEmptyValues;
+
+      if (needsDetection) {
+        const forceMode = options.forceConfigFromData;
+        const detectionReason = forceMode
+          ? 'Explicit --force-config-from-data flag (overriding ALL config values)'
+          : 'Empty config values detected (auto-filling missing values only)';
+
         console.log('\n🤖 AI-Powered Config Detection...');
+        console.log(`   Mode: ${detectionReason}`);
         console.log('   Analyzing sample queries to detect language, location, and domain...');
 
         try {
@@ -118,24 +129,40 @@ program
           }
           console.log(`      Confidence: ${detected.confidence.toUpperCase()}\n`);
 
-          // Override config with detected values (unless explicitly set via CLI)
-          if (!options.language) {
-            config.LANGUAGE = detected.language;
-          }
-          if (!options.location) {
-            config.USER_LOCATION = detected.location;
-          }
-          if (detected.targetDomain && !options.domain) {
-            config.TARGET_DOMAIN = detected.targetDomain;
+          // Apply detected values based on mode:
+          // FORCE MODE: Override all values unless explicitly set via CLI
+          // AUTO MODE: Only fill in missing/empty config values
+          if (forceMode) {
+            // Force mode: Override everything (unless CLI arg provided)
+            if (!options.language) {
+              config.LANGUAGE = detected.language;
+            }
+            if (!options.location) {
+              config.USER_LOCATION = detected.location;
+            }
+            if (detected.targetDomain && !options.domain) {
+              config.TARGET_DOMAIN = detected.targetDomain;
+            }
+          } else {
+            // Auto mode: Only populate missing values
+            if (!options.language && !config.LANGUAGE) {
+              config.LANGUAGE = detected.language;
+            }
+            if (!options.location && !config.USER_LOCATION) {
+              config.USER_LOCATION = detected.location;
+            }
+            if (detected.targetDomain && !options.domain && !config.TARGET_DOMAIN) {
+              config.TARGET_DOMAIN = detected.targetDomain;
+            }
           }
 
-          console.log('   📋 Using detected configuration:');
+          console.log('   📋 Final configuration:');
           console.log(`      Target Domain: ${config.TARGET_DOMAIN}`);
           console.log(`      User Location: ${config.USER_LOCATION}`);
           console.log(`      Language: ${config.LANGUAGE.toUpperCase()}\n`);
         } catch (error) {
           console.error('   ⚠️  Config detection failed:', error);
-          console.log('   Continuing with default configuration...\n');
+          console.log('   Continuing with current configuration...\n');
         }
       }
 
