@@ -10,7 +10,7 @@ exports.VisibilityProcessor = void 0;
 const p_queue_1 = __importDefault(require("p-queue"));
 const openai_client_1 = require("./openai-client");
 const gemini_client_1 = require("./gemini-client");
-const utils_1 = require("./utils");
+const prompt_utils_1 = require("./prompt-utils");
 const constants_1 = require("./constants");
 class VisibilityProcessor {
     constructor(config) {
@@ -51,7 +51,7 @@ class VisibilityProcessor {
                 this.stats.errors++;
             }
             // Rate limiting delay
-            await (0, utils_1.sleep)(constants_1.PROCESSING_CONSTANTS.RATE_LIMIT_DELAY_MS);
+            await (0, prompt_utils_1.sleep)(constants_1.PROCESSING_CONSTANTS.RATE_LIMIT_DELAY_MS);
         }
         return results;
     }

@@ -8,12 +8,16 @@
   },
   "scripts": {
     "build": "tsc",
+    "build:worker": "tsx scripts/build-worker.ts",
+    "build:all": "npm run build && npm run build:gas && npm run build:worker",
     "dev": "tsx src/cli.ts",
+    "dev:worker": "wrangler dev",
     "start": "node dist/cli.js",
     "build:gas": "tsx scripts/build-gas.ts",
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint src/**/*.ts",
-    "lint:fix": "eslint src/**/*.ts --fix"
+    "typecheck": "tsc --noEmit && tsc --project workers/tsconfig.json --noEmit",
+    "lint": "eslint src/**/*.ts workers/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts workers/**/*.ts --fix",
+    "deploy": "wrangler deploy"
   },
   "keywords": [
     "ai",
@@ -41,9 +45,11 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251121.0",
     "@typescript-eslint/eslint-plugin": "^8.47.0",
     "@typescript-eslint/parser": "^8.47.0",
+    "esbuild": "^0.24.0",
     "eslint": "^9.39.1",
-    "esbuild": "^0.24.0"
+    "wrangler": "^3.114.15"
   }
 }

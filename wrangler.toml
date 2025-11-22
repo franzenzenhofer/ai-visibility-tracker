@@ -1,0 +1,42 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "ai-visibility-by-gsc-export"
+main = "dist/workers/index.js"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Cloudflare account
+account_id = "ecf21e85812dfa5b2a35245257fc71f5"
+
+# Custom domain routing (franzai.com)
+# Auto-configures DNS for subdomain
+routes = [
+  { pattern = "ai-visibility-by-gsc-export.franzai.com", custom_domain = true }
+]
+
+# Static assets configuration
+# Serves files from workers/static/ directory
+[site]
+bucket = "workers/static"
+
+# Environment variables (non-sensitive)
+[vars]
+ENVIRONMENT = "production"
+
+# Build configuration
+[build]
+command = "npm run build:worker"
+watch_dirs = ["workers", "src", "geo-visibility-config.toml"]
+
+# Development server settings
+[dev]
+port = 8787
+local_protocol = "http"
+
+# Limits
+[limits]
+cpu_ms = 50000 # Allow up to 50s CPU time per request (for long processing)
+
+# Compatibility settings
+[compatibility_flags]
+# Enable compatibility with Node.js modules
+nodejs_compat = true

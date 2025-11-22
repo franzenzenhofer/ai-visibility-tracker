@@ -82,7 +82,7 @@ Respond with ONLY the JSON object, no explanations.`;
   try {
     const detected = JSON.parse(content) as DetectedConfig;
     return detected;
-  } catch (error) {
+  } catch {
     throw new Error(`Failed to parse AI response: ${content}`);
   }
 }

@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.cityFromLocation = exports.validateConfig = exports.getCountryOptions = exports.getLanguageOptions = exports.ensureConfigReady = exports.seedResultsFromQueries = exports.findQueryColumn = exports.findDataSheet = exports.setRowStatus = exports.writeRow = exports.buildEmptyRow = exports.normalizeOutputRow = exports.writeLog = exports.readPrompts = exports.readSettings = exports.resetPromptsSheet = exports.resetSettingsSheet = exports.ensureSheets = exports.OUTPUT_HEADERS = exports.SHEETS = void 0;
 const config_1 = require("./generated/config");
 const constants_1 = require("../constants");
-const utils_1 = require("../utils");
+const query_utils_1 = require("../query-utils");
 exports.SHEETS = {
     QUERIES: 'Queries',
     RESULTS: 'Results',
@@ -240,7 +240,7 @@ const findQueryColumn = (data) => {
         let queryCount = 0;
         for (let r = 0; r < samples; r++) {
             const cell = String(rows[r][col] ?? '');
-            if ((0, utils_1.isQueryLike)(cell))
+            if ((0, query_utils_1.isQueryLike)(cell))
                 queryCount++;
         }
         const score = samples === 0 ? 0 : queryCount / samples;

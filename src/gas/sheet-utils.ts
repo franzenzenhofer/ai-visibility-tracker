@@ -1,6 +1,6 @@
 import { DEFAULT_SETTINGS, DEFAULT_PROMPTS } from './generated/config';
 import { RESULT_STATUS, PROCESSING_CONSTANTS, LOCATION_CONFIG } from '../constants';
-import { isQueryLike } from '../utils';
+import { isQueryLike } from '../query-utils';
 import { GasConfig } from './models';
 
 export const SHEETS = {
