@@ -30,7 +30,6 @@ program
   .option('-d, --domain <domain>', 'Target domain to track (overrides .env)')
   .option('-l, --location <location>', 'User location (overrides .env)')
   .option('--language <lang>', 'Language for persona prompts (ISO 639-1 code: en, de, es, fr, etc.)')
-  .option('-b, --batch <size>', 'Batch size (overrides .env)')
   .option('--skip <lines>', 'Skip first N lines from Excel file', '0')
   .option('--count <number>', 'Number of queries to process (default: 3)', '3')
   .option('-n, --limit <count>', 'DEPRECATED: Use --count instead', '0')
@@ -43,7 +42,6 @@ program
     domain?: string;
     location?: string;
     language?: string;
-    batch?: string;
     skip?: string;
     count?: string;
     limit?: string;
@@ -79,9 +77,6 @@ program
       if (options.language) {
         config.LANGUAGE = options.language.toLowerCase();
       }
-      if (options.batch) {
-        config.BATCH_SIZE = parseInt(options.batch, 10);
-      }
       if (options.modelOpenai) {
         config.MODEL_OPENAI = options.modelOpenai;
       }
@@ -92,7 +87,6 @@ program
       console.log(`   Target Domain: ${config.TARGET_DOMAIN}`);
       console.log(`   User Location: ${config.USER_LOCATION}`);
       console.log(`   Language: ${config.LANGUAGE.toUpperCase()}`);
-      console.log(`   Batch Size: ${config.BATCH_SIZE}`);
       console.log(`   OpenAI Model: ${config.MODEL_OPENAI}`);
       console.log(`   Gemini Model: ${config.MODEL_GEMINI}\n`);
 
@@ -201,7 +195,6 @@ program
       console.log(`   TARGET_DOMAIN: ${config.TARGET_DOMAIN}`);
       console.log(`   USER_LOCATION: ${config.USER_LOCATION}`);
       console.log(`   LANGUAGE: ${config.LANGUAGE.toUpperCase()}`);
-      console.log(`   BATCH_SIZE: ${config.BATCH_SIZE}`);
       console.log(`   MODEL_OPENAI: ${config.MODEL_OPENAI}`);
       console.log(`   MODEL_GEMINI: ${config.MODEL_GEMINI}\n`);
     } catch (error) {

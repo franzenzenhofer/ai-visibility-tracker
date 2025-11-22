@@ -69,7 +69,6 @@ export const loadConfig = (): Config => {
     TARGET_DOMAIN: (tomlConfig.target_domain || 'wien.gv.at').toLowerCase(),
     USER_LOCATION: tomlConfig.user_location || 'Vienna, Austria',
     LANGUAGE: tomlConfig.language || 'en',
-    BATCH_SIZE: tomlConfig.batch_size || 3,
     MODEL_OPENAI: tomlConfig.model_openai || 'gpt-5-mini',
     MODEL_GEMINI: tomlConfig.model_gemini || 'gemini-2.5-flash',
     PROMPTS: {

@@ -10,7 +10,6 @@ export interface Config {
   TARGET_DOMAIN: string;
   USER_LOCATION: string;
   LANGUAGE: string;
-  BATCH_SIZE: number;
   MODEL_OPENAI: string;
   MODEL_GEMINI: string;
   PROMPTS: {
