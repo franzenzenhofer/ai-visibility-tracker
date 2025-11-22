@@ -13,6 +13,7 @@ import {
   saveResultsToFile,
 } from './output-writer';
 import { setGlobalDebugMode } from './logger';
+import { detectConfigFromQueries } from './config-detector';
 
 const program = new Command();
 
@@ -35,6 +36,7 @@ program
   .option('-n, --limit <count>', 'DEPRECATED: Use --count instead', '0')
   .option('--model-openai <model>', 'OpenAI model to use (overrides .env)')
   .option('--model-gemini <model>', 'Gemini model to use (overrides .env)')
+  .option('--force-config-from-data', 'Auto-detect language, location, and domain from sample queries using AI', false)
   .option('--debug', 'Enable debug mode (show all requests and responses)', false)
   .action(async (inputFile: string, options: {
     outputDir?: string;
@@ -47,6 +49,7 @@ program
     limit?: string;
     modelOpenai?: string;
     modelGemini?: string;
+    forceConfigFromData?: boolean;
     debug?: boolean;
   }) => {
     // Enable debug mode if flag is set
@@ -94,6 +97,47 @@ program
       console.log('📖 Reading Excel file...');
       let queries = readExcelFile(inputFile);
       console.log(`   Found ${queries.length} queries`);
+
+      // Auto-detect configuration from data if requested
+      if (options.forceConfigFromData) {
+        console.log('\n🤖 AI-Powered Config Detection...');
+        console.log('   Analyzing sample queries to detect language, location, and domain...');
+
+        try {
+          const detected = await detectConfigFromQueries(
+            queries,
+            config.OPENAI_API_KEY,
+            20
+          );
+
+          console.log('\n   ✅ Configuration detected:');
+          console.log(`      Language: ${detected.language.toUpperCase()}`);
+          console.log(`      Location: ${detected.location}`);
+          if (detected.targetDomain) {
+            console.log(`      Target Domain: ${detected.targetDomain}`);
+          }
+          console.log(`      Confidence: ${detected.confidence.toUpperCase()}\n`);
+
+          // Override config with detected values (unless explicitly set via CLI)
+          if (!options.language) {
+            config.LANGUAGE = detected.language;
+          }
+          if (!options.location) {
+            config.USER_LOCATION = detected.location;
+          }
+          if (detected.targetDomain && !options.domain) {
+            config.TARGET_DOMAIN = detected.targetDomain;
+          }
+
+          console.log('   📋 Using detected configuration:');
+          console.log(`      Target Domain: ${config.TARGET_DOMAIN}`);
+          console.log(`      User Location: ${config.USER_LOCATION}`);
+          console.log(`      Language: ${config.LANGUAGE.toUpperCase()}\n`);
+        } catch (error) {
+          console.error('   ⚠️  Config detection failed:', error);
+          console.log('   Continuing with default configuration...\n');
+        }
+      }
 
       // Skip lines if specified
       const skip = parseInt(options.skip || '0', 10);
