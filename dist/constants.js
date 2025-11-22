@@ -4,7 +4,7 @@
  * Centralized location for all magic numbers and strings
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.URL_PROTOCOLS = exports.DOMAIN_PREFIXES_TO_REMOVE = exports.PROMPT_PLACEHOLDERS = exports.OUTPUT_HEADERS = exports.MODEL_TEMPERATURE = exports.LOCATION_CONFIG = exports.RESULT_STATUS = exports.PROCESSING_CONSTANTS = void 0;
+exports.GSC_HEADERS = exports.URL_PROTOCOLS = exports.DOMAIN_PREFIXES_TO_REMOVE = exports.PROMPT_PLACEHOLDERS = exports.OUTPUT_HEADERS = exports.MODEL_TEMPERATURE = exports.LOCATION_CONFIG = exports.RESULT_STATUS = exports.PROCESSING_CONSTANTS = void 0;
 /**
  * Processing configuration constants
  */
@@ -78,3 +78,13 @@ exports.DOMAIN_PREFIXES_TO_REMOVE = ['www.'];
  * URL protocols to identify
  */
 exports.URL_PROTOCOLS = ['http', 'www.'];
+/**
+ * Google Search Console header variations (multilingual)
+ */
+exports.GSC_HEADERS = [
+    'Top queries',
+    'Query',
+    'Suchanfrage',
+    'Keyword',
+    'Search term',
+];

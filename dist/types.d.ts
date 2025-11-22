@@ -1,7 +1,8 @@
 /**
  * Type definitions for AI Visibility Tracker
  */
-import { ResultStatus } from './constants';
+import { ResultStatus as RS } from './constants';
+export type ResultStatus = RS;
 export interface Config {
     OPENAI_API_KEY: string;
     GEMINI_API_KEY: string;

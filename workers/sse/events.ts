@@ -6,20 +6,11 @@
 import { ProcessedResult, SerpResult } from '../../src/types';
 import { sendSSE } from './stream';
 
-export const sendInit = async (
-  w: WritableStreamDefaultWriter<string>,
-  total: number
-): Promise<void> => {
-  await sendSSE(w, 'init', { totalQueries: total });
-};
+export const sendInit = (w: WritableStreamDefaultWriter<string>, total: number) =>
+  sendSSE(w, 'init', { total });
 
-export const sendQueryStart = async (
-  w: WritableStreamDefaultWriter<string>,
-  index: number,
-  query: string
-): Promise<void> => {
-  await sendSSE(w, 'query_start', { index, query });
-};
+export const sendQueryStart = (w: WritableStreamDefaultWriter<string>, index: number, query: string) =>
+  sendSSE(w, 'query_start', { index, query });
 
 export const sendStep = async (
   w: WritableStreamDefaultWriter<string>,
@@ -36,24 +27,17 @@ export const sendQueryComplete = async (
   await sendSSE(w, 'query_complete', result);
 };
 
-export const sendProgress = async (
-  w: WritableStreamDefaultWriter<string>,
-  current: number,
-  total: number
-): Promise<void> => {
-  await sendSSE(w, 'progress', { current, total });
-};
+export const sendProgress = (w: WritableStreamDefaultWriter<string>, current: number, total: number) =>
+  sendSSE(w, 'progress', { current, total });
 
-export const sendError = async (
-  w: WritableStreamDefaultWriter<string>,
-  error: string
-): Promise<void> => {
-  await sendSSE(w, 'error', { error });
-};
+export const sendError = (w: WritableStreamDefaultWriter<string>, error: string) =>
+  sendSSE(w, 'error', { error });
 
-export const sendComplete = async (
-  w: WritableStreamDefaultWriter<string>,
-  stats: Record<string, number>
-): Promise<void> => {
-  await sendSSE(w, 'complete', stats);
-};
+export const sendComplete = (w: WritableStreamDefaultWriter<string>, stats: Record<string, number>) =>
+  sendSSE(w, 'complete', stats);
+
+export const sendApiRequest = (w: WritableStreamDefaultWriter<string>, service: string, model: string, prompt: string) =>
+  sendSSE(w, 'api_request', { service, model, prompt });
+
+export const sendApiResponse = (w: WritableStreamDefaultWriter<string>, service: string, result: string | SerpResult[] | null, elapsed?: number) =>
+  sendSSE(w, 'api_response', { service, result, elapsed });

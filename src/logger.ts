@@ -1,14 +1,25 @@
 /**
- * Logging utility with debug mode support
+ * Logging utility with debug mode support + optional SSE streaming
  */
+
+// Type definitions for SSE sender functions (avoids cross-directory import)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SseSenderFn = (writer: WritableStreamDefaultWriter<string>, service: string, ...args: any[]) => Promise<void>;
 
 export class Logger {
   private debugMode: boolean;
   private timers: Map<string, number>;
+  private sseWriter: WritableStreamDefaultWriter<string> | null = null;
+  private sseSenders: { sendApiRequest: SseSenderFn; sendApiResponse: SseSenderFn } | null = null;
 
   constructor(debugMode: boolean = false) {
     this.debugMode = debugMode;
     this.timers = new Map();
+  }
+
+  setSseWriter(writer: WritableStreamDefaultWriter<string> | null, senders?: { sendApiRequest: SseSenderFn; sendApiResponse: SseSenderFn }): void {
+    this.sseWriter = writer;
+    this.sseSenders = senders || null;
   }
 
   /**
@@ -19,13 +30,18 @@ export class Logger {
   }
 
   /**
-   * Log request details (only in debug mode)
+   * Log request details (only in debug mode) + optional SSE
    */
   logRequest(service: string, model: string, prompt: string, options?: Record<string, unknown>): void {
-    if (!this.debugMode) return;
-
     // Start timer for this request
     this.timers.set(service, Date.now());
+
+    // Send SSE event if writer available
+    if (this.sseWriter && this.sseSenders) {
+      this.sseSenders.sendApiRequest(this.sseWriter, service, model, prompt).catch(() => {});
+    }
+
+    if (!this.debugMode) return;
 
     console.log('\n' + '='.repeat(80));
     console.log(`📤 REQUEST TO ${service.toUpperCase()} [${model}]`);
@@ -41,15 +57,20 @@ export class Logger {
   }
 
   /**
-   * Log response details (only in debug mode)
+   * Log response details (only in debug mode) + optional SSE
    */
   logResponse(service: string, status: string, response: string | null, metadata?: Record<string, unknown>): void {
-    if (!this.debugMode) return;
-
     // Calculate elapsed time
     const startTime = this.timers.get(service);
     const elapsed = startTime ? Date.now() - startTime : null;
     this.timers.delete(service);
+
+    // Send SSE event if writer available
+    if (this.sseWriter && this.sseSenders) {
+      this.sseSenders.sendApiResponse(this.sseWriter, service, response, elapsed || undefined).catch(() => {});
+    }
+
+    if (!this.debugMode) return;
 
     console.log('\n' + '='.repeat(80));
     console.log(`📥 RESPONSE FROM ${service.toUpperCase()} [${status}]`);
@@ -89,9 +110,14 @@ export class Logger {
   }
 
   /**
-   * Log error details (always logged)
+   * Log error details (always logged) + optional SSE
    */
   logError(service: string, error: Error): void {
+    // Send SSE event if writer available
+    if (this.sseWriter && this.sseSenders) {
+      this.sseSenders.sendApiResponse(this.sseWriter, service, `ERROR: ${error.message}`, undefined).catch(() => {});
+    }
+
     console.error(`\n❌ ERROR in ${service}:`);
     console.error(error.message);
 

@@ -3,109 +3,284 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Visibility Tracker</title>
+  <title>AI Visibility Tracker - Debug Mode</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: system-ui, -apple-system, sans-serif; padding: 2rem; background: #f5f5f5; }
-    .container { max-width: 1200px; margin: 0 auto; }
-    h1 { color: #333; margin-bottom: 0.5rem; }
-    .subtitle { color: #666; margin-bottom: 2rem; }
-    .card { background: white; padding: 1.5rem; margin-bottom: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-    .form-group { margin-bottom: 1rem; }
-    label { display: block; font-weight: 600; margin-bottom: 0.5rem; }
-    input, select { width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
-    button { padding: 0.75rem 1.5rem; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 600; }
-    button:hover { background: #0056b3; }
-    button:disabled { background: #ccc; cursor: not-allowed; }
-    .btn-secondary { background: #6c757d; }
-    .btn-secondary:hover { background: #545b62; }
-    #fileInput { padding: 0.5rem 0; }
+    body { font-family: 'SF Mono', Monaco, 'Courier New', monospace; background: #1e1e1e; color: #d4d4d4; font-size: 13px; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+    h1 { color: #4ec9b0; margin-bottom: 0.5rem; font-size: 18px; }
+    h2 { color: #569cd6; margin-bottom: 0.75rem; font-size: 14px; }
+    .subtitle { color: #858585; margin-bottom: 1rem; font-size: 12px; }
+    .card { background: #252526; padding: 1rem; margin-bottom: 1rem; border-radius: 4px; border: 1px solid #3e3e42; }
+    .form-group { margin-bottom: 0.75rem; }
+    label { display: block; font-weight: 600; margin-bottom: 0.25rem; color: #9cdcfe; font-size: 12px; }
+    input, select { width: 100%; padding: 0.5rem; border: 1px solid #3e3e42; border-radius: 4px; font-size: 12px; background: #1e1e1e; color: #d4d4d4; font-family: inherit; }
+    button { padding: 0.5rem 1rem; background: #0e639c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; font-family: inherit; }
+    button:hover { background: #1177bb; }
+    button:disabled { background: #3e3e42; cursor: not-allowed; color: #858585; }
+    .btn-success { background: #107c10; }
+    .btn-success:hover { background: #0f8f0f; }
+    .btn-danger { background: #e81123; }
+    .btn-danger:hover { background: #c50f1f; }
     .progress { margin: 1rem 0; }
-    .progress-bar { height: 20px; background: #ddd; border-radius: 4px; overflow: hidden; }
-    .progress-fill { height: 100%; background: #28a745; transition: width 0.3s; }
-    #results { margin-top: 2rem; }
-    .result-item { padding: 1rem; margin-bottom: 1rem; border-left: 4px solid #007bff; background: #f8f9fa; }
-    .status-visible { border-left-color: #28a745; }
-    .status-invisible { border-left-color: #dc3545; }
-    .status-tool-only { border-left-color: #ffc107; }
+    .progress-bar { height: 16px; background: #3e3e42; border-radius: 4px; overflow: hidden; }
+    .progress-fill { height: 100%; background: #107c10; transition: width 0.3s; }
+
+    /* Layout: Settings/Logs Top, Table Bottom */
+    .controls-section { height: 50vh; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; overflow: hidden; padding: 1rem; border-bottom: 1px solid #3e3e42; }
+    .table-section { flex: 1; overflow: hidden; display: flex; flex-direction: column; padding: 1rem; }
+
+    /* Results Table (CLI format) - MAIN FOCUS */
+    #resultsTable { flex: 1; overflow: auto; display: flex; flex-direction: column; }
+    #resultsTable.hidden { display: none; }
+    #resultsTable h2 { margin-bottom: 0.5rem; }
+    .table-wrapper { flex: 1; overflow: auto; border: 1px solid #3e3e42; border-radius: 4px; max-height: 600px; }
+    #dataTable { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 11px; table-layout: auto; white-space: nowrap; }
+    #dataTable th { background: #3e3e42; padding: 0.5rem; text-align: left; border: 1px solid #1e1e1e; color: #9cdcfe; font-weight: 600; position: sticky; top: 0; z-index: 10; }
+    #dataTable th:nth-child(1) { width: 150px; } /* Query */
+    #dataTable th:nth-child(2) { width: 200px; } /* Persona */
+    #dataTable th:nth-child(3) { width: 100px; } /* Status */
+    #dataTable th:nth-child(4) { width: 60px; } /* GPT Rank */
+    #dataTable th:nth-child(5) { width: 250px; } /* GPT URLs */
+    #dataTable th:nth-child(6) { width: 60px; } /* GPT Rank Web */
+    #dataTable th:nth-child(7) { width: 250px; } /* GPT URLs Web */
+    #dataTable th:nth-child(8) { width: 60px; } /* Gem Rank */
+    #dataTable th:nth-child(9) { width: 250px; } /* Gem URLs */
+    #dataTable th:nth-child(10) { width: 60px; } /* Gem Rank Web */
+    #dataTable th:nth-child(11) { width: 250px; } /* Gem URLs Web */
+    #dataTable td { padding: 0.5rem; border: 1px solid #3e3e42; background: #252526; vertical-align: top; }
+    #dataTable tbody tr:hover { background: #2d2d30; }
+    #dataTable td a { color: #569cd6; text-decoration: none; word-break: break-all; }
+    #dataTable td a:hover { text-decoration: underline; }
+    #dataTable .persona-cell { white-space: normal; font-size: 10px; }
+    #dataTable td:nth-child(2) { white-space: normal; max-width: 250px; } /* Persona column wraps */
+    #dataTable td:nth-child(n+5):nth-child(-n+11) { white-space: normal; max-width: 300px; } /* URL columns wrap */
+
+    /* Settings Panel (Left) */
+    .settings-panel { overflow-y: auto; padding-right: 0.5rem; }
+
+    /* Debug Panel (Right) */
+    .debug-panel { background: #1e1e1e; border: 1px solid #3e3e42; border-radius: 4px; display: flex; flex-direction: column; overflow: hidden; }
+    .debug-header { padding: 0.75rem; border-bottom: 1px solid #3e3e42; display: flex; justify-content: space-between; align-items: center; }
+    .debug-body { flex: 1; overflow-y: auto; padding: 0.75rem; }
+    .log-entry { margin-bottom: 0.5rem; padding: 0.5rem; border-radius: 3px; font-size: 11px; line-height: 1.4; }
+    .log-info { background: #264f78; border-left: 3px solid #569cd6; }
+    .log-error { background: #5a1d1d; border-left: 3px solid #f48771; }
+    .log-request { background: #283419; border-left: 3px solid #4ec9b0; }
+    .log-response { background: #272c35; border-left: 3px solid #9cdcfe; }
+    .log-sse { background: #3b2c52; border-left: 3px solid #c586c0; }
+    .log-timestamp { color: #858585; font-size: 10px; }
+    .log-data { margin-top: 0.25rem; color: #ce9178; white-space: pre-wrap; font-size: 10px; }
     .hidden { display: none; }
+
+    /* Stats */
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 1rem; }
+    .stat-card { background: #252526; padding: 0.5rem; border-radius: 4px; text-align: center; border: 1px solid #3e3e42; }
+    .stat-value { font-size: 20px; font-weight: bold; color: #4ec9b0; }
+    .stat-label { font-size: 10px; color: #858585; margin-top: 0.25rem; }
+
+    .copy-btn { padding: 0.25rem 0.5rem; font-size: 11px; }
+
+    /* Status colors */
+    .status-VISIBLE { color: #107c10; font-weight: 600; }
+    .status-INVISIBLE { color: #e81123; font-weight: 600; }
+    .status-TOOL_ONLY { color: #f9a825; font-weight: 600; }
+    .status-ERROR { color: #d13438; font-weight: 600; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>🔍 AI Visibility Tracker</h1>
-    <p class="subtitle">Track your domain visibility across GPT & Gemini</p>
+  <!-- Top Section: Settings (Left) | Debug Log (Right) -->
+  <div class="controls-section">
+    <!-- Left: Settings Panel -->
+    <div class="settings-panel">
+      <h1>🔍 AI Visibility Tracker</h1>
+      <p class="subtitle">Debug Mode - All events visible</p>
+      <p id="versionInfo" style="font-size: 10px; color: #555; margin-bottom: 1rem;">Loading version info...</p>
 
-    <div class="card">
-      <h2>Upload File</h2>
-      <div class="form-group">
-        <label for="fileInput">GSC Export (Excel/CSV)</label>
-        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>API Keys (BYOK - Bring Your Own Keys)</h2>
-      <div class="form-group">
-        <label for="openaiKey">OpenAI API Key</label>
-        <input type="password" id="openaiKey" placeholder="sk-proj-...">
-      </div>
-      <div class="form-group">
-        <label for="geminiKey">Google Gemini API Key</label>
-        <input type="password" id="geminiKey" placeholder="AIza...">
-      </div>
-      <button onclick="saveKeys()">💾 Save Keys (localStorage)</button>
-    </div>
-
-    <div class="card">
-      <h2>Configuration</h2>
-      <button onclick="autoDetect()" id="detectBtn" disabled>🤖 Auto-Detect Config</button>
-      <div class="form-group">
-        <label for="targetDomain">Target Domain</label>
-        <input type="text" id="targetDomain" placeholder="example.com">
-      </div>
-      <div class="form-group">
-        <label for="userLocation">User Location</label>
-        <input type="text" id="userLocation" placeholder="Vienna, Austria">
-      </div>
-      <div class="form-group">
-        <label for="queryLimit">Query Limit</label>
-        <select id="queryLimit">
-          <option value="3">3 queries (recommended)</option>
-          <option value="10">10 queries</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="card">
-      <button onclick="startProcessing()" id="startBtn" disabled>▶️ Start Processing</button>
-      <div id="progressSection" class="progress hidden">
-        <div class="progress-bar">
-          <div class="progress-fill" id="progressFill"></div>
+      <div class="card">
+        <h2>Upload File</h2>
+        <div class="form-group">
+          <label for="fileInput">GSC Export (Excel/CSV)</label>
+          <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
         </div>
-        <p id="progressText">Processing...</p>
+      </div>
+
+      <div class="card">
+        <h2>API Keys (BYOK)</h2>
+        <div class="form-group">
+          <label for="openaiKey">OpenAI API Key</label>
+          <input type="password" id="openaiKey" placeholder="sk-proj-...">
+        </div>
+        <div class="form-group">
+          <label for="geminiKey">Google Gemini API Key</label>
+          <input type="password" id="geminiKey" placeholder="AIza...">
+        </div>
+        <button onclick="saveKeys()" class="btn-success">💾 Save Keys</button>
+      </div>
+
+      <div class="card">
+        <h2>Configuration</h2>
+        <button onclick="autoDetect()" id="detectBtn" disabled>🤖 Auto-Detect</button>
+        <div class="form-group">
+          <label for="targetDomain">Target Domain</label>
+          <input type="text" id="targetDomain" placeholder="example.com">
+        </div>
+        <div class="form-group">
+          <label for="userLocation">User Location</label>
+          <input type="text" id="userLocation" placeholder="Vienna, Austria">
+        </div>
+        <div class="form-group">
+          <label for="language">Language (ISO code)</label>
+          <input type="text" id="language" placeholder="en" maxlength="2" style="text-transform: lowercase;">
+          <small style="font-size: 10px; color: #858585; display: block; margin-top: 4px;">2-letter code: en, de, fr, es, it, etc.</small>
+        </div>
+        <div class="form-group">
+          <label for="queryLimit">Query Limit</label>
+          <select id="queryLimit">
+            <option value="3">3 queries (recommended)</option>
+            <option value="10">10 queries</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card">
+        <button onclick="startProcessing()" id="startBtn" disabled class="btn-success">▶️ Start Processing</button>
+        <div id="progressSection" class="progress hidden">
+          <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+          <p id="progressText">Idle</p>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat-card">
+          <div class="stat-value" id="statVisible">0</div>
+          <div class="stat-label">VISIBLE</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statInvisible">0</div>
+          <div class="stat-label">INVISIBLE</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statErrors">0</div>
+          <div class="stat-label">ERRORS</div>
+        </div>
       </div>
     </div>
 
-    <div id="results"></div>
+    <!-- Right: Debug Panel -->
+    <div class="debug-panel">
+      <div class="debug-header">
+        <h2 style="margin: 0;">🐛 Debug Log</h2>
+        <div>
+          <button onclick="copyLogs()" class="copy-btn">📋 Copy</button>
+          <button onclick="clearLogs()" class="copy-btn btn-danger">🗑️ Clear</button>
+        </div>
+      </div>
+      <div class="debug-body" id="debugLog"></div>
+    </div>
+  </div>
+
+  <!-- Bottom Section: Results Table (MAIN FOCUS) -->
+  <div class="table-section">
+    <div id="resultsTable" class="hidden">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+        <h2 style="margin: 0;">📊 Results Table (CLI Format) - <span id="tableRowCount">0 rows</span></h2>
+        <div>
+          <button onclick="copyAsCSV()" style="margin-right: 0.5rem; padding: 0.5rem 1rem; background: #0e639c; color: white; border: none; border-radius: 4px; cursor: pointer;">📋 Copy as CSV</button>
+          <button onclick="copyAsMarkdown()" style="padding: 0.5rem 1rem; background: #0e639c; color: white; border: none; border-radius: 4px; cursor: pointer;">📋 Copy as Markdown</button>
+        </div>
+      </div>
+      <div class="table-wrapper" style="overflow-x: auto; overflow-y: auto;">
+        <table id="dataTable">
+          <thead>
+            <tr>
+              <th>Original Query</th>
+              <th>Persona Prompt</th>
+              <th>Status</th>
+              <th>GPT Rank</th>
+              <th>GPT URLs (ALL 5)</th>
+              <th>GPT Rank (Web)</th>
+              <th>GPT URLs Web (ALL 5)</th>
+              <th>Gemini Rank</th>
+              <th>Gemini URLs (ALL 5)</th>
+              <th>Gemini Rank (Web)</th>
+              <th>Gemini URLs Web (ALL 5)</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="tablePlaceholder" style="display: flex; align-items: center; justify-content: center; height: 100%; color: #858585;">
+      <p>📊 Results will appear here after processing...</p>
+    </div>
   </div>
 
   <script>
-    let uploadedFile = null;
-    let eventSource = null;
+    // Logger (REUSES pattern from src/logger.ts)
+    const logger = {
+      logs: [],
+      log(level, message, data = null, service = null) {
+        const entry = { timestamp: Date.now(), level, message, data, service };
+        this.logs.push(entry);
 
-    // Load saved keys
-    document.addEventListener('DOMContentLoaded', () => {
+        const log = document.getElementById('debugLog');
+        const div = document.createElement('div');
+        div.className = `log-entry log-${level}`;
+
+        const time = new Date(entry.timestamp).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
+        let html = `<div class="log-timestamp">[${time}] ${level.toUpperCase()}</div>`;
+        html += `<div>${message}</div>`;
+        if (data) {
+          html += `<div class="log-data">${typeof data === 'string' ? data : JSON.stringify(data, null, 2)}</div>`;
+        }
+        div.innerHTML = html;
+        log.appendChild(div);
+        log.scrollTop = log.scrollHeight;
+      },
+
+      clear() {
+        this.logs = [];
+        document.getElementById('debugLog').innerHTML = '';
+      }
+    };
+
+    let uploadedFile = null;
+    let stats = { visible: 0, invisible: 0, errors: 0 };
+
+    // Load saved keys and version info
+    document.addEventListener('DOMContentLoaded', async () => {
+      logger.log('info', '🚀 App initialized');
+
+      // Fetch version info
+      try {
+        const res = await fetch('/api/version');
+        const data = await res.json();
+        const localTime = new Date(data.deployedAt).toLocaleString();
+        document.getElementById('versionInfo').textContent =
+          `v${data.version} | Deployed: ${localTime}`;
+      } catch (e) {
+        document.getElementById('versionInfo').textContent = 'Version: unknown';
+      }
+
       const openai = localStorage.getItem('openaiKey');
       const gemini = localStorage.getItem('geminiKey');
-      if (openai) document.getElementById('openaiKey').value = openai;
-      if (gemini) document.getElementById('geminiKey').value = gemini;
+      if (openai) {
+        document.getElementById('openaiKey').value = openai;
+        logger.log('info', '✓ OpenAI key loaded from localStorage');
+      }
+      if (gemini) {
+        document.getElementById('geminiKey').value = gemini;
+        logger.log('info', '✓ Gemini key loaded from localStorage');
+      }
     });
 
     document.getElementById('fileInput').addEventListener('change', (e) => {
       uploadedFile = e.target.files[0];
       document.getElementById('detectBtn').disabled = !uploadedFile;
       document.getElementById('startBtn').disabled = !uploadedFile;
+      logger.log('info', `📁 File selected: ${uploadedFile?.name} (${(uploadedFile?.size / 1024).toFixed(2)} KB)`);
     });
 
     function saveKeys() {
@@ -113,71 +288,275 @@
       const gemini = document.getElementById('geminiKey').value;
       localStorage.setItem('openaiKey', openai);
       localStorage.setItem('geminiKey', gemini);
-      alert('Keys saved to localStorage!');
+      logger.log('info', '💾 API keys saved to localStorage');
     }
 
     async function autoDetect() {
+      logger.log('request', '📤 Starting auto-detection...', null, 'detect');
       const formData = new FormData();
       formData.append('file', uploadedFile);
       formData.append('openaiApiKey', document.getElementById('openaiKey').value);
 
-      const res = await fetch('/api/detect', { method: 'POST', body: formData });
-      const data = await res.json();
+      try {
+        const res = await fetch('/api/detect', { method: 'POST', body: formData });
+        const data = await res.json();
+        logger.log('response', `📥 Auto-detection response (${res.status})`, data, 'detect');
 
-      if (data.success) {
-        document.getElementById('targetDomain').value = data.detected.targetDomain;
-        document.getElementById('userLocation').value = data.detected.userLocation;
-        alert('Auto-detection complete!');
-      } else {
-        alert('Error: ' + data.error);
+        if (data.success) {
+          document.getElementById('targetDomain').value = data.detected.targetDomain;
+          document.getElementById('userLocation').value = data.detected.userLocation;
+          document.getElementById('language').value = data.detected.language || 'en';
+          logger.log('info', '✅ Auto-detection complete', data.detected);
+        } else {
+          logger.log('error', '❌ Auto-detection failed', data.error);
+        }
+      } catch (err) {
+        logger.log('error', '❌ Auto-detection error', err.message);
       }
     }
 
-    function startProcessing() {
+    async function startProcessing() {
+      logger.log('info', '▶️ Starting processing...');
+      stats = { visible: 0, invisible: 0, errors: 0 };
+
       const formData = new FormData();
       formData.append('file', uploadedFile);
       formData.append('openaiApiKey', document.getElementById('openaiKey').value);
       formData.append('geminiApiKey', document.getElementById('geminiKey').value);
       formData.append('targetDomain', document.getElementById('targetDomain').value);
       formData.append('userLocation', document.getElementById('userLocation').value);
+      formData.append('language', document.getElementById('language').value || 'en');
       formData.append('queryLimit', document.getElementById('queryLimit').value);
+
+      logger.log('request', '📤 POSTing to /api/process', {
+        file: uploadedFile.name,
+        domain: document.getElementById('targetDomain').value,
+        location: document.getElementById('userLocation').value,
+        language: document.getElementById('language').value || 'en',
+        limit: document.getElementById('queryLimit').value
+      }, 'process');
 
       document.getElementById('progressSection').classList.remove('hidden');
       document.getElementById('startBtn').disabled = true;
-      document.getElementById('results').innerHTML = '';
+      document.getElementById('resultsTable').classList.add('hidden');
+      document.getElementById('tablePlaceholder').style.display = 'flex';
+      document.getElementById('dataTable').querySelector('tbody').innerHTML = '';
+      document.getElementById('tableRowCount').textContent = '0 rows';
 
-      eventSource = new EventSource('/api/process?' + new URLSearchParams(
-        Array.from(formData.entries()).map(([k, v]) => [k, typeof v === 'string' ? v : ''])
-      ));
+      try {
+        const res = await fetch('/api/process', { method: 'POST', body: formData });
 
-      eventSource.onmessage = (e) => {
-        const event = JSON.parse(e.data);
-
-        if (event.type === 'progress') {
-          const pct = (event.data.current / event.data.total) * 100;
-          document.getElementById('progressFill').style.width = pct + '%';
-          document.getElementById('progressText').textContent =
-            `Processing ${event.data.current}/${event.data.total}...`;
-        }
-
-        if (event.type === 'query_complete') {
-          const result = event.data;
-          const resultHtml = `
-            <div class="result-item status-${result.status}">
-              <strong>${result.originalQuery}</strong>
-              <p>Status: ${result.status.toUpperCase()}</p>
-              <p>GPT: Rank ${result.gptRank} | Gemini: Rank ${result.gemRank}</p>
-            </div>
-          `;
-          document.getElementById('results').insertAdjacentHTML('beforeend', resultHtml);
-        }
-
-        if (event.type === 'complete') {
+        if (!res.ok) {
+          const text = await res.text();
+          logger.log('error', `❌ HTTP ${res.status}: ${res.statusText}`, text);
+          document.getElementById('progressText').textContent = `Error ${res.status}`;
           document.getElementById('startBtn').disabled = false;
-          document.getElementById('progressText').textContent = 'Complete!';
-          eventSource.close();
+          return;
         }
-      };
+
+        logger.log('response', `📥 SSE connection opened (${res.status})`, null, 'process');
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const eventData = line.slice(6);
+              logger.log('sse', `📨 SSE event`, eventData);
+
+              try {
+                const event = JSON.parse(eventData);
+                handleSSEEvent(event);
+              } catch (err) {
+                logger.log('error', '❌ Failed to parse SSE event', err.message);
+              }
+            }
+          }
+        }
+
+        logger.log('info', '✅ Processing complete');
+        document.getElementById('startBtn').disabled = false;
+      } catch (err) {
+        logger.log('error', '❌ Processing error', err.message);
+        document.getElementById('progressText').textContent = 'Error!';
+        document.getElementById('startBtn').disabled = false;
+      }
+    }
+
+    function handleSSEEvent(event) {
+      if (event.type === 'init') {
+        logger.log('info', `🔢 Total queries: ${event.data.total}`);
+        document.getElementById('progressText').textContent = `0/${event.data.total} queries`;
+      }
+
+      if (event.type === 'query_start') {
+        logger.log('info', `🔍 Query ${event.data.index + 1}: ${event.data.query}`);
+      }
+
+      if (event.type === 'api_request') {
+        const isGemini = event.data.service.includes('Gemini');
+        const icon = isGemini ? '💎' : '🤖';
+        logger.log('request', `${icon} ${event.data.service} [${event.data.model}]`, event.data.prompt);
+      }
+
+      if (event.type === 'api_response') {
+        const isGemini = event.data.service.includes('Gemini');
+        const icon = isGemini ? '💎' : '🤖';
+        const elapsed = event.data.elapsed ? ` (${event.data.elapsed}ms)` : '';
+        const result = event.data.result || '(empty response)';
+        logger.log('response', `${icon} ${event.data.service}${elapsed}`, result);
+      }
+
+      if (event.type === 'step') {
+        logger.log('sse', `⚙️ Step: ${event.data.step}`, event.data.result);
+      }
+
+      if (event.type === 'progress') {
+        const pct = (event.data.current / event.data.total) * 100;
+        document.getElementById('progressFill').style.width = pct + '%';
+        document.getElementById('progressText').textContent =
+          `${event.data.current}/${event.data.total} queries (${pct.toFixed(0)}%)`;
+      }
+
+      if (event.type === 'query_complete') {
+        const result = event.data;
+        logger.log('info', `✅ Query complete: ${result.status}`, result);
+
+        // Update stats
+        if (result.status === 'VISIBLE') stats.visible++;
+        else if (result.status === 'INVISIBLE') stats.invisible++;
+        else stats.errors++;
+
+        document.getElementById('statVisible').textContent = stats.visible;
+        document.getElementById('statInvisible').textContent = stats.invisible;
+        document.getElementById('statErrors').textContent = stats.errors;
+
+        // Show table, hide placeholder
+        document.getElementById('resultsTable').classList.remove('hidden');
+        document.getElementById('tablePlaceholder').style.display = 'none';
+
+        // Format ALL URLs function - SHOW FULL URLS (this is a visibility tool!)
+        const formatUrls = (urls) => {
+          if (!urls || urls.length === 0) return '-';
+          return urls.map((u, i) =>
+            `<div style="margin: 2px 0; word-break: break-all;">${i + 1}. <a href="${u.url}" target="_blank" style="font-size: 10px;">${u.url}</a></div>`
+          ).join('');
+        };
+
+        // Add to data table (SHOWS ALL URLs returned by API!)
+        const tbody = document.getElementById('dataTable').querySelector('tbody');
+        const row = tbody.insertRow();
+        row.innerHTML = `
+          <td>${result.originalQuery}</td>
+          <td class="persona-cell">${result.personaPrompt}</td>
+          <td class="status-${result.status}">${result.status}</td>
+          <td>${result.gptRank}</td>
+          <td style="font-size: 10px;">${formatUrls(result.gptNoToolResults)}</td>
+          <td>${result.gptRankWeb}</td>
+          <td style="font-size: 10px;">${formatUrls(result.gptWithToolResults)}</td>
+          <td>${result.gemRank}</td>
+          <td style="font-size: 10px;">${formatUrls(result.gemNoGroundingResults)}</td>
+          <td>${result.gemRankWeb}</td>
+          <td style="font-size: 10px;">${formatUrls(result.gemWithGroundingResults)}</td>
+        `;
+
+        // Update row count
+        document.getElementById('tableRowCount').textContent = `${tbody.rows.length} rows`;
+      }
+
+      if (event.type === 'complete') {
+        logger.log('info', '🎉 All queries processed', event.data);
+        document.getElementById('progressText').textContent = 'Complete!';
+      }
+
+      if (event.type === 'error') {
+        logger.log('error', '❌ Server error', event.data.error);
+        stats.errors++;
+        document.getElementById('statErrors').textContent = stats.errors;
+      }
+    }
+
+    function copyLogs() {
+      const text = logger.logs.map(l => {
+        const time = new Date(l.timestamp).toISOString();
+        let line = `[${time}] ${l.level.toUpperCase()}: ${l.message}`;
+        if (l.data) line += `\n${typeof l.data === 'string' ? l.data : JSON.stringify(l.data, null, 2)}`;
+        return line;
+      }).join('\n\n');
+
+      navigator.clipboard.writeText(text).then(() => {
+        logger.log('info', '📋 Logs copied to clipboard');
+      });
+    }
+
+    function clearLogs() {
+      logger.clear();
+      logger.log('info', '🗑️ Logs cleared');
+    }
+
+    // Copy table as CSV
+    function copyAsCSV() {
+      const table = document.getElementById('dataTable');
+      const rows = table.querySelectorAll('tr');
+      let csv = [];
+
+      rows.forEach(row => {
+        const cols = row.querySelectorAll('td, th');
+        const rowData = [];
+        cols.forEach(col => {
+          // Extract text content, remove extra whitespace, and escape quotes
+          let text = col.textContent.trim().replace(/\s+/g, ' ').replace(/"/g, '""');
+          rowData.push(`"${text}"`);
+        });
+        csv.push(rowData.join(','));
+      });
+
+      const csvContent = csv.join('\n');
+      navigator.clipboard.writeText(csvContent).then(() => {
+        alert('✅ Table copied as CSV to clipboard!');
+      }).catch(err => {
+        alert('❌ Failed to copy: ' + err.message);
+      });
+    }
+
+    // Copy table as Markdown
+    function copyAsMarkdown() {
+      const table = document.getElementById('dataTable');
+      const rows = table.querySelectorAll('tr');
+      let markdown = [];
+
+      rows.forEach((row, index) => {
+        const cols = row.querySelectorAll('td, th');
+        const rowData = [];
+        cols.forEach(col => {
+          // Extract text content and remove extra whitespace
+          let text = col.textContent.trim().replace(/\s+/g, ' ');
+          rowData.push(text);
+        });
+        markdown.push('| ' + rowData.join(' | ') + ' |');
+
+        // Add separator after header row
+        if (index === 0) {
+          const separator = '| ' + Array(cols.length).fill('---').join(' | ') + ' |';
+          markdown.push(separator);
+        }
+      });
+
+      const markdownContent = markdown.join('\n');
+      navigator.clipboard.writeText(markdownContent).then(() => {
+        alert('✅ Table copied as Markdown to clipboard!');
+      }).catch(err => {
+        alert('❌ Failed to copy: ' + err.message);
+      });
     }
   </script>
 </body>
