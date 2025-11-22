@@ -30,18 +30,21 @@
 # Target Domain - The domain you want to track in AI search results
 # Format: domain.com (without http:// or www.)
 # Examples: "wien.gv.at", "marktguru.at", "mycompany.com"
-target_domain = "marktguru.at"
+# If empty: Automatically detected from sample queries when using --force-config-from-data
+target_domain = ""
 
 # User Location - Geographic context for searches (MOST IMPORTANT!)
 # Format: "City, Country"
 # This is used in ALL prompts to provide local context
 # Examples: "Vienna, Austria", "New York, USA", "London, UK", "Berlin, Germany"
+# If empty: Automatically detected from sample queries when using --force-config-from-data
 # Effect: Provides crucial geographic context for local results
-user_location = "Vienna, Austria"
+user_location = ""
 
 # Language - Language for persona prompts and responses
 # Format: ISO 639-1 two-letter code
 # Examples: "en" (English), "de" (German), "es" (Spanish), "fr" (French), "it" (Italian)
+# If empty: Defaults to "en" (English), or auto-detected when using --force-config-from-data
 # Effect: Determines the language used in persona generation prompts
 # The model will be explicitly instructed to return results in this language
 language = "en"

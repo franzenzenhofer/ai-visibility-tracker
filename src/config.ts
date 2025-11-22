@@ -63,12 +63,23 @@ export const loadConfig = (): Config => {
   // Extract prompts
   const prompts = tomlConfig.prompts || {};
 
+  // For target_domain and user_location: preserve empty strings from config
+  // (they trigger auto-detection in CLI)
+  // For language: default to 'en' if empty or undefined
+  const targetDomain = tomlConfig.target_domain !== undefined
+    ? tomlConfig.target_domain.toLowerCase()
+    : '';
+  const userLocation = tomlConfig.user_location !== undefined
+    ? tomlConfig.user_location
+    : '';
+  const language = tomlConfig.language || 'en';
+
   return {
     OPENAI_API_KEY: apiKey,
     GEMINI_API_KEY: geminiKey,
-    TARGET_DOMAIN: (tomlConfig.target_domain || 'wien.gv.at').toLowerCase(),
-    USER_LOCATION: tomlConfig.user_location || 'Vienna, Austria',
-    LANGUAGE: tomlConfig.language || 'en',
+    TARGET_DOMAIN: targetDomain,
+    USER_LOCATION: userLocation,
+    LANGUAGE: language,
     MODEL_OPENAI: tomlConfig.model_openai || 'gpt-5-mini',
     MODEL_GEMINI: tomlConfig.model_gemini || 'gemini-2.5-flash',
     PROMPTS: {
