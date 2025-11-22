@@ -90,20 +90,24 @@ Export queries from Google Search Console as an Excel file. The tool will auto-d
 ### 4. Run Analysis
 
 ```bash
-# Basic usage (3 queries, console output only)
+# ✨ ZERO-CONFIG MODE: Auto-detects language, location, and domain from your data!
+# (Config file has empty values by default)
 npm run dev -- process your-gsc-export.xlsx
 
-# Process 10 queries
-npm run dev -- process your-gsc-export.xlsx -n 10
+# Process 10 queries with auto-detection
+npm run dev -- process your-gsc-export.xlsx --count 10
 
-# Save results to directory
-npm run dev -- process your-gsc-export.xlsx -n 10 -o results/
+# Auto-detect and save results to CSV
+npm run dev -- process your-gsc-export.xlsx --count 10 -o results/
 
-# Export as Excel
-npm run dev -- process your-gsc-export.xlsx -f xlsx -o results/
+# Auto-detect and export as Excel
+npm run dev -- process your-gsc-export.xlsx --count 10 -f xlsx -o results/
 
-# Verbose mode (shows all requests, responses, and timing)
-npm run dev -- process your-gsc-export.xlsx --debug
+# Force re-detection (override config file values)
+npm run dev -- process your-gsc-export.xlsx --force-config-from-data --count 10
+
+# Debug mode - shows EVERYTHING (all API calls, requests, responses, timing)
+npm run dev -- process your-gsc-export.xlsx --debug --count 5
 ```
 
 ---
@@ -128,18 +132,22 @@ Process queries from an Excel file and analyze AI visibility.
 | `-n, --limit <count>` | DEPRECATED: Use --count instead | `0` |
 | `--model-openai <model>` | OpenAI model to use | From config |
 | `--model-gemini <model>` | Gemini model to use | From config |
+| `--force-config-from-data` | Force AI detection of all config values (overrides config file) | `false` |
 | `--debug` | Enable verbose mode (show all requests/responses + timing) | `false` |
 
 **Examples:**
 
 ```bash
-# Basic usage with defaults (first 3 queries)
+# ✨ ZERO-CONFIG: Auto-detects language, location, and domain (first 3 queries)
 npm run dev -- process data.xlsx
 
-# Process 50 queries with debug logging
+# Auto-detection with 50 queries and debug logging
 npm run dev -- process data.xlsx --count 50 --debug
 
-# Custom domain and location
+# Force re-detection (override config file values)
+npm run dev -- process data.xlsx --force-config-from-data --count 20
+
+# Custom domain and location (overrides auto-detection)
 npm run dev -- process data.xlsx -d example.com -l "Berlin, Germany"
 
 # German language persona prompts
@@ -164,6 +172,9 @@ npm run dev -- process data.xlsx \
   -o results/ \
   -f xlsx \
   --debug
+
+# Complete workflow: Auto-detect, save CSV, and debug
+npm run dev -- process data.xlsx --count 50 -o results/ --debug
 ```
 
 ### `config`
