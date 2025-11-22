@@ -85,7 +85,7 @@ Export queries from Google Search Console as an Excel file. The tool will auto-d
 - `Keyword` (various)
 - And more...
 
-**Sample Data:** A sample GSC export file is provided in `sampledata/sample-gsc-export.xlsx` for testing.
+**Note:** Export your data as XLSX or CSV from Google Search Console.
 
 ### 4. Run Analysis
 
