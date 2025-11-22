@@ -7,14 +7,27 @@ import {
   normalizeDomain,
 } from '../utils';
 import { GasConfig, ProcessedRow, SerpResult } from './models';
-import {
-  writeRow,
-  setRowStatus,
-  writeLog,
-  OUTPUT_HEADERS,
-  SHEETS,
-  cityFromLocation,
-} from './sheet-utils';
+import { writeRow, setRowStatus, writeLog, OUTPUT_HEADERS, SHEETS, cityFromLocation } from './sheet-utils';
+
+export const buildRowValues = (query: string, state: ProcessedRow) => [
+  query,
+  state.personaPrompt,
+  state.status,
+  state.checkStatus,
+  state.gptRank,
+  state.gptUrl,
+  state.gptRankWeb,
+  state.gptUrlWeb,
+  state.gemRank,
+  state.gemUrl,
+  state.gemRankWeb,
+  state.gemUrlWeb,
+  state.gptNoAll,
+  state.gptWebAll,
+  state.gemNoAll,
+  state.gemWebAll,
+  state.error || '',
+];
 
 export const processBatch = (cfg: GasConfig, shouldCancel: () => boolean) => {
   const ss = SpreadsheetApp.getActive();
@@ -36,26 +49,13 @@ export const processBatch = (cfg: GasConfig, shouldCancel: () => boolean) => {
     const query = row[0] as string;
     try {
       setRowStatus(rSheet, idx + 2, 'processing');
-      const processed = processRow(String(query), cfg, idx + 2);
-      writeRow(rSheet, idx + 2, [
-        query,
-        processed.personaPrompt,
-        processed.status,
-        processed.checkStatus,
-        processed.gptRank,
-        processed.gptUrl,
-        processed.gptRankWeb,
-        processed.gptUrlWeb,
-        processed.gemRank,
-        processed.gemUrl,
-        processed.gemRankWeb,
-        processed.gemUrlWeb,
-        processed.gptNoAll,
-        processed.gptWebAll,
-        processed.gemNoAll,
-        processed.gemWebAll,
-        processed.error || '',
-      ]);
+      const processed = processRow(
+        String(query),
+        cfg,
+        idx + 2,
+        state => writeRow(rSheet, idx + 2, buildRowValues(query, state))
+      );
+      writeRow(rSheet, idx + 2, buildRowValues(query, processed));
       setRowStatus(rSheet, idx + 2, processed.status);
     } catch (err) {
       errors++;
@@ -89,18 +89,76 @@ export const processBatch = (cfg: GasConfig, shouldCancel: () => boolean) => {
   return { done, errors };
 };
 
-export const processRow = (query: string, cfg: GasConfig, rowIndex: number): ProcessedRow => {
+const blankState = (): ProcessedRow => ({
+  personaPrompt: '',
+  status: RESULT_STATUS.INVISIBLE,
+  checkStatus: 'pending',
+  gptRank: '-',
+  gptUrl: '-',
+  gptRankWeb: '-',
+  gptUrlWeb: '-',
+  gemRank: '-',
+  gemUrl: '-',
+  gemRankWeb: '-',
+  gemUrlWeb: '-',
+  gptNoAll: '',
+  gptWebAll: '',
+  gemNoAll: '',
+  gemWebAll: '',
+});
+
+export const processRow = (
+  query: string,
+  cfg: GasConfig,
+  rowIndex: number,
+  onPartial?: (state: ProcessedRow) => void
+): ProcessedRow => {
   const target = normalizeDomain(cfg.targetDomain);
+  const state = blankState();
+  const update = (patch: Partial<ProcessedRow>) => {
+    Object.assign(state, patch);
+    onPartial?.({ ...state });
+  };
 
   const persona = generatePersona(query, cfg);
   writeLog('INFO', `Persona generated for "${query}" [row ${rowIndex}]: ${persona}`);
+  update({ personaPrompt: persona, checkStatus: 'processing' });
 
-  const [gptNo, gptWeb, gemNo, gemWeb] = runMatrix(persona, cfg, query);
+  const gptNo = queryOpenAINoTools(persona, cfg, query);
+  update({
+    gptNoAll: serializeResults(gptNo),
+    gptRank: findRank(gptNo, target).rank,
+    gptUrl: findRank(gptNo, target).url,
+  });
+
+  const gptWeb = queryOpenAIWithTools(persona, cfg, query);
+  const rWeb = findRank(gptWeb, target);
+  update({
+    gptWebAll: serializeResults(gptWeb),
+    gptRankWeb: rWeb.rank,
+    gptUrlWeb: rWeb.url,
+  });
+
+  const gemNo = queryGeminiNoGrounding(persona, cfg, query);
+  const rGemNo = findRank(gemNo, target);
+  update({
+    gemNoAll: serializeResults(gemNo),
+    gemRank: rGemNo.rank,
+    gemUrl: rGemNo.url,
+  });
+
+  const gemWeb = queryGeminiWithGrounding(persona, cfg, query);
+  const rGemWeb = findRank(gemWeb, target);
+  update({
+    gemWebAll: serializeResults(gemWeb),
+    gemRankWeb: rGemWeb.rank,
+    gemUrlWeb: rGemWeb.url,
+  });
 
   const r1 = findRank(gptNo, target);
-  const r2 = findRank(gptWeb, target);
-  const r3 = findRank(gemNo, target);
-  const r4 = findRank(gemWeb, target);
+  const r2 = rWeb;
+  const r3 = rGemNo;
+  const r4 = rGemWeb;
 
   let status: ResultStatus = RESULT_STATUS.INVISIBLE;
   if (!gptNo && !gptWeb && !gemNo && !gemWeb) status = RESULT_STATUS.ERROR;
@@ -111,23 +169,8 @@ export const processRow = (query: string, cfg: GasConfig, rowIndex: number): Pro
     }
   }
 
-  return {
-    personaPrompt: persona,
-    status,
-    checkStatus: 'done',
-    gptRank: r1.rank,
-    gptUrl: r1.url,
-    gptRankWeb: r2.rank,
-    gptUrlWeb: r2.url,
-    gemRank: r3.rank,
-    gemUrl: r3.url,
-    gemRankWeb: r4.rank,
-    gemUrlWeb: r4.url,
-    gptNoAll: serializeResults(gptNo),
-    gptWebAll: serializeResults(gptWeb),
-    gemNoAll: serializeResults(gemNo),
-    gemWebAll: serializeResults(gemWeb),
-  };
+  update({ status, checkStatus: 'done' });
+  return { ...state };
 };
 
 const generatePersona = (keyword: string, cfg: GasConfig): string => {
@@ -200,10 +243,7 @@ const queryOpenAIWithTools = (prompt: string, cfg: GasConfig, label: string): Se
   };
 
   const resp = callOpenAIResponse(cfg.openaiKey, body, `OpenAI WithTools for "${label}"`);
-  const text =
-    resp.output_text ||
-    (resp.output && resp.output[0] && resp.output[0].content && resp.output[0].content[0] && resp.output[0].content[0].text) ||
-    '';
+  const text = extractOpenAIResponseText(resp);
   return parseSerpJson(text || '');
 };
 
@@ -307,6 +347,27 @@ const extractTextFromGemini = (resp: any): string => {
   const candidates = resp.candidates || [];
   const parts = candidates[0]?.content?.parts || [];
   return parts.map((p: { text?: string }) => p.text || '').join('');
+};
+
+const extractOpenAIResponseText = (resp: any): string => {
+  if (!resp) return '';
+  if (resp.output_text) return resp.output_text;
+  if (Array.isArray(resp.output)) {
+    for (const item of resp.output) {
+      const contentArray = item?.content;
+      if (Array.isArray(contentArray)) {
+        const text = contentArray.map((c: any) => c?.text || '').join('');
+        if (text.trim()) return text;
+      }
+      const messageContent = item?.message?.content;
+      if (Array.isArray(messageContent)) {
+        const text = messageContent.map((c: any) => c?.text || '').join('');
+        if (text.trim()) return text;
+      }
+      if (typeof item?.text === 'string' && item.text.trim()) return item.text;
+    }
+  }
+  return '';
 };
 
 const findRank = (results: SerpResult[] | null, target: string) => {
