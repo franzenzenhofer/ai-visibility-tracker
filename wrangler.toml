@@ -8,13 +8,11 @@ compatibility_flags = ["nodejs_compat"]
 account_id = "ecf21e85812dfa5b2a35245257fc71f5"
 
 # Custom domain routing (franzai.com)
-# Auto-configures DNS for subdomain
 routes = [
   { pattern = "ai-visibility-by-gsc-export.franzai.com", custom_domain = true }
 ]
 
 # Static assets configuration
-# Serves files from workers/static/ directory
 [site]
 bucket = "workers/static"
 
@@ -34,9 +32,4 @@ local_protocol = "http"
 
 # Limits
 [limits]
-cpu_ms = 50000 # Allow up to 50s CPU time per request (for long processing)
-
-# Compatibility settings
-[compatibility_flags]
-# Enable compatibility with Node.js modules
-nodejs_compat = true
+cpu_ms = 50000
