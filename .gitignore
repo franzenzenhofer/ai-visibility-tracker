@@ -29,8 +29,11 @@ trash/
 test*.csv
 test*.js
 check-*.js
+analyze-*.js
 *.xlsx
-!sampledata/*.xlsx
+
+# Sample data (user data, not for git)
+sampledata/
 
 # Temporary files
 *.tmp
