@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.processRow = exports.processBatch = exports.buildRowValues = void 0;
-const config_1 = require("./generated/config");
 const constants_1 = require("../constants");
 const utils_1 = require("../utils");
 const sheet_utils_1 = require("./sheet-utils");
@@ -28,6 +27,7 @@ exports.buildRowValues = buildRowValues;
 const processBatch = (cfg, shouldCancel) => {
     const ss = SpreadsheetApp.getActive();
     const rSheet = ss.getSheetByName(sheet_utils_1.SHEETS.RESULTS);
+    const prompts = (0, sheet_utils_1.readPrompts)();
     const data = rSheet
         .getRange(2, 1, rSheet.getLastRow() - 1, sheet_utils_1.OUTPUT_HEADERS.length)
         .getValues();
@@ -43,7 +43,7 @@ const processBatch = (cfg, shouldCancel) => {
         const query = row[0];
         try {
             (0, sheet_utils_1.setRowStatus)(rSheet, idx + 2, 'processing');
-            const processed = (0, exports.processRow)(String(query), cfg, idx + 2, state => (0, sheet_utils_1.writeRow)(rSheet, idx + 2, (0, exports.buildRowValues)(query, state)));
+            const processed = (0, exports.processRow)(String(query), cfg, idx + 2, prompts, state => (0, sheet_utils_1.writeRow)(rSheet, idx + 2, (0, exports.buildRowValues)(query, state)));
             (0, sheet_utils_1.writeRow)(rSheet, idx + 2, (0, exports.buildRowValues)(query, processed));
             (0, sheet_utils_1.setRowStatus)(rSheet, idx + 2, processed.status);
         }
@@ -94,37 +94,37 @@ const blankState = () => ({
     gemNoAll: '',
     gemWebAll: '',
 });
-const processRow = (query, cfg, rowIndex, onPartial) => {
+const processRow = (query, cfg, rowIndex, prompts, onPartial) => {
     const target = (0, utils_1.normalizeDomain)(cfg.targetDomain);
     const state = blankState();
     const update = (patch) => {
         Object.assign(state, patch);
         onPartial?.({ ...state });
     };
-    const persona = generatePersona(query, cfg);
+    const persona = generatePersona(query, cfg, prompts);
     (0, sheet_utils_1.writeLog)('INFO', `Persona generated for "${query}" [row ${rowIndex}]: ${persona}`);
     update({ personaPrompt: persona, checkStatus: 'processing' });
-    const gptNo = queryOpenAINoTools(persona, cfg, query);
+    const gptNo = queryOpenAINoTools(persona, cfg, query, prompts);
     update({
         gptNoAll: serializeResults(gptNo),
         gptRank: findRank(gptNo, target).rank,
         gptUrl: findRank(gptNo, target).url,
     });
-    const gptWeb = queryOpenAIWithTools(persona, cfg, query);
+    const gptWeb = queryOpenAIWithTools(persona, cfg, query, prompts);
     const rWeb = findRank(gptWeb, target);
     update({
         gptWebAll: serializeResults(gptWeb),
         gptRankWeb: rWeb.rank,
         gptUrlWeb: rWeb.url,
     });
-    const gemNo = queryGeminiNoGrounding(persona, cfg, query);
+    const gemNo = queryGeminiNoGrounding(persona, cfg, query, prompts);
     const rGemNo = findRank(gemNo, target);
     update({
         gemNoAll: serializeResults(gemNo),
         gemRank: rGemNo.rank,
         gemUrl: rGemNo.url,
     });
-    const gemWeb = queryGeminiWithGrounding(persona, cfg, query);
+    const gemWeb = queryGeminiWithGrounding(persona, cfg, query, prompts);
     const rGemWeb = findRank(gemWeb, target);
     update({
         gemWebAll: serializeResults(gemWeb),
@@ -148,8 +148,8 @@ const processRow = (query, cfg, rowIndex, onPartial) => {
     return { ...state };
 };
 exports.processRow = processRow;
-const generatePersona = (keyword, cfg) => {
-    const systemPrompt = (0, utils_1.replacePromptPlaceholders)(config_1.DEFAULT_PROMPTS.persona_system || '', cfg.userLocation);
+const generatePersona = (keyword, cfg, prompts) => {
+    const systemPrompt = (0, utils_1.replacePromptPlaceholders)(prompts.persona_system || '', cfg.userLocation);
     const system = `${systemPrompt}\nIMPORTANT: You MUST return the result in the language code: ${cfg.language.toUpperCase()}`;
     const messages = [
         { role: 'system', content: system },
@@ -160,16 +160,9 @@ const generatePersona = (keyword, cfg) => {
         throw new Error('Persona generation failed');
     return resp;
 };
-const runMatrix = (persona, cfg, label) => {
-    const gptNo = queryOpenAINoTools(persona, cfg, label);
-    const gptWeb = queryOpenAIWithTools(persona, cfg, label);
-    const gemNo = queryGeminiNoGrounding(persona, cfg, label);
-    const gemWeb = queryGeminiWithGrounding(persona, cfg, label);
-    return [gptNo, gptWeb, gemNo, gemWeb];
-};
-const queryOpenAINoTools = (prompt, cfg, label) => {
-    const systemPrompt = (0, utils_1.replacePromptPlaceholders)(config_1.DEFAULT_PROMPTS.search_openai_no_tools_system || '', cfg.userLocation);
-    const userPrompt = (0, utils_1.replacePromptPlaceholders)(config_1.DEFAULT_PROMPTS.search_openai_no_tools_user || '', cfg.userLocation, prompt);
+const queryOpenAINoTools = (prompt, cfg, label, prompts) => {
+    const systemPrompt = (0, utils_1.replacePromptPlaceholders)(prompts.search_openai_no_tools_system || '', cfg.userLocation);
+    const userPrompt = (0, utils_1.replacePromptPlaceholders)(prompts.search_openai_no_tools_user || '', cfg.userLocation, prompt);
     const messages = [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
@@ -177,9 +170,9 @@ const queryOpenAINoTools = (prompt, cfg, label) => {
     const content = callOpenAIChat(cfg.openaiKey, cfg.modelOpenai, messages, `OpenAI NoTools for "${label}"`);
     return (0, utils_1.parseSerpJson)(content || '');
 };
-const queryOpenAIWithTools = (prompt, cfg, label) => {
-    const systemPrompt = (0, utils_1.replacePromptPlaceholders)(config_1.DEFAULT_PROMPTS.search_openai_with_tools_system || '', cfg.userLocation);
-    const userPrompt = (0, utils_1.replacePromptPlaceholders)(config_1.DEFAULT_PROMPTS.search_openai_with_tools_user || '', cfg.userLocation, prompt);
+const queryOpenAIWithTools = (prompt, cfg, label, prompts) => {
+    const systemPrompt = (0, utils_1.replacePromptPlaceholders)(prompts.search_openai_with_tools_system || '', cfg.userLocation);
+    const userPrompt = (0, utils_1.replacePromptPlaceholders)(prompts.search_openai_with_tools_user || '', cfg.userLocation, prompt);
     const body = {
         model: cfg.modelOpenai,
         input: `${systemPrompt}\n\n${userPrompt}`,
@@ -198,8 +191,8 @@ const queryOpenAIWithTools = (prompt, cfg, label) => {
     const text = extractOpenAIResponseText(resp);
     return (0, utils_1.parseSerpJson)(text || '');
 };
-const queryGeminiNoGrounding = (prompt, cfg, label) => {
-    const textPrompt = (0, utils_1.replacePromptPlaceholders)(config_1.DEFAULT_PROMPTS.search_gemini_no_grounding || '', cfg.userLocation, prompt);
+const queryGeminiNoGrounding = (prompt, cfg, label, prompts) => {
+    const textPrompt = (0, utils_1.replacePromptPlaceholders)(prompts.search_gemini_no_grounding || '', cfg.userLocation, prompt);
     const body = {
         contents: [
             {
@@ -213,8 +206,8 @@ const queryGeminiNoGrounding = (prompt, cfg, label) => {
     const text = extractTextFromGemini(resp);
     return (0, utils_1.parseSerpJson)(text || '');
 };
-const queryGeminiWithGrounding = (prompt, cfg, label) => {
-    const textPrompt = (0, utils_1.replacePromptPlaceholders)(config_1.DEFAULT_PROMPTS.search_gemini_with_grounding || '', cfg.userLocation, prompt);
+const queryGeminiWithGrounding = (prompt, cfg, label, prompts) => {
+    const textPrompt = (0, utils_1.replacePromptPlaceholders)(prompts.search_gemini_with_grounding || '', cfg.userLocation, prompt);
     const body = {
         contents: [
             {

@@ -1,4 +1,3 @@
-import { DEFAULT_PROMPTS } from './generated/config';
 import { RESULT_STATUS, PROCESSING_CONSTANTS, LOCATION_CONFIG, ResultStatus } from '../constants';
 import {
   parseSerpJson,
@@ -7,7 +6,7 @@ import {
   normalizeDomain,
 } from '../utils';
 import { GasConfig, ProcessedRow, SerpResult } from './models';
-import { writeRow, setRowStatus, writeLog, OUTPUT_HEADERS, SHEETS, cityFromLocation } from './sheet-utils';
+import { writeRow, setRowStatus, writeLog, OUTPUT_HEADERS, SHEETS, cityFromLocation, readPrompts } from './sheet-utils';
 
 export const buildRowValues = (query: string, state: ProcessedRow) => [
   query,
@@ -32,6 +31,7 @@ export const buildRowValues = (query: string, state: ProcessedRow) => [
 export const processBatch = (cfg: GasConfig, shouldCancel: () => boolean) => {
   const ss = SpreadsheetApp.getActive();
   const rSheet = ss.getSheetByName(SHEETS.RESULTS);
+  const prompts = readPrompts();
   const data = rSheet
     .getRange(2, 1, rSheet.getLastRow() - 1, OUTPUT_HEADERS.length)
     .getValues() as unknown[][];
@@ -53,6 +53,7 @@ export const processBatch = (cfg: GasConfig, shouldCancel: () => boolean) => {
         String(query),
         cfg,
         idx + 2,
+        prompts,
         state => writeRow(rSheet, idx + 2, buildRowValues(query, state))
       );
       writeRow(rSheet, idx + 2, buildRowValues(query, processed));
@@ -111,6 +112,7 @@ export const processRow = (
   query: string,
   cfg: GasConfig,
   rowIndex: number,
+  prompts: Record<string, string>,
   onPartial?: (state: ProcessedRow) => void
 ): ProcessedRow => {
   const target = normalizeDomain(cfg.targetDomain);
@@ -120,18 +122,18 @@ export const processRow = (
     onPartial?.({ ...state });
   };
 
-  const persona = generatePersona(query, cfg);
+  const persona = generatePersona(query, cfg, prompts);
   writeLog('INFO', `Persona generated for "${query}" [row ${rowIndex}]: ${persona}`);
   update({ personaPrompt: persona, checkStatus: 'processing' });
 
-  const gptNo = queryOpenAINoTools(persona, cfg, query);
+  const gptNo = queryOpenAINoTools(persona, cfg, query, prompts);
   update({
     gptNoAll: serializeResults(gptNo),
     gptRank: findRank(gptNo, target).rank,
     gptUrl: findRank(gptNo, target).url,
   });
 
-  const gptWeb = queryOpenAIWithTools(persona, cfg, query);
+  const gptWeb = queryOpenAIWithTools(persona, cfg, query, prompts);
   const rWeb = findRank(gptWeb, target);
   update({
     gptWebAll: serializeResults(gptWeb),
@@ -139,7 +141,7 @@ export const processRow = (
     gptUrlWeb: rWeb.url,
   });
 
-  const gemNo = queryGeminiNoGrounding(persona, cfg, query);
+  const gemNo = queryGeminiNoGrounding(persona, cfg, query, prompts);
   const rGemNo = findRank(gemNo, target);
   update({
     gemNoAll: serializeResults(gemNo),
@@ -147,7 +149,7 @@ export const processRow = (
     gemUrl: rGemNo.url,
   });
 
-  const gemWeb = queryGeminiWithGrounding(persona, cfg, query);
+  const gemWeb = queryGeminiWithGrounding(persona, cfg, query, prompts);
   const rGemWeb = findRank(gemWeb, target);
   update({
     gemWebAll: serializeResults(gemWeb),
@@ -173,9 +175,9 @@ export const processRow = (
   return { ...state };
 };
 
-const generatePersona = (keyword: string, cfg: GasConfig): string => {
+const generatePersona = (keyword: string, cfg: GasConfig, prompts: Record<string, string>): string => {
   const systemPrompt = replacePromptPlaceholders(
-    DEFAULT_PROMPTS.persona_system || '',
+    prompts.persona_system || '',
     cfg.userLocation
   );
   const system = `${systemPrompt}\nIMPORTANT: You MUST return the result in the language code: ${cfg.language.toUpperCase()}`;
@@ -188,21 +190,13 @@ const generatePersona = (keyword: string, cfg: GasConfig): string => {
   return resp;
 };
 
-const runMatrix = (persona: string, cfg: GasConfig, label: string): Array<SerpResult[] | null> => {
-  const gptNo = queryOpenAINoTools(persona, cfg, label);
-  const gptWeb = queryOpenAIWithTools(persona, cfg, label);
-  const gemNo = queryGeminiNoGrounding(persona, cfg, label);
-  const gemWeb = queryGeminiWithGrounding(persona, cfg, label);
-  return [gptNo, gptWeb, gemNo, gemWeb];
-};
-
-const queryOpenAINoTools = (prompt: string, cfg: GasConfig, label: string): SerpResult[] | null => {
+const queryOpenAINoTools = (prompt: string, cfg: GasConfig, label: string, prompts: Record<string, string>): SerpResult[] | null => {
   const systemPrompt = replacePromptPlaceholders(
-    DEFAULT_PROMPTS.search_openai_no_tools_system || '',
+    prompts.search_openai_no_tools_system || '',
     cfg.userLocation
   );
   const userPrompt = replacePromptPlaceholders(
-    DEFAULT_PROMPTS.search_openai_no_tools_user || '',
+    prompts.search_openai_no_tools_user || '',
     cfg.userLocation,
     prompt
   );
@@ -216,13 +210,13 @@ const queryOpenAINoTools = (prompt: string, cfg: GasConfig, label: string): Serp
   return parseSerpJson(content || '');
 };
 
-const queryOpenAIWithTools = (prompt: string, cfg: GasConfig, label: string): SerpResult[] | null => {
+const queryOpenAIWithTools = (prompt: string, cfg: GasConfig, label: string, prompts: Record<string, string>): SerpResult[] | null => {
   const systemPrompt = replacePromptPlaceholders(
-    DEFAULT_PROMPTS.search_openai_with_tools_system || '',
+    prompts.search_openai_with_tools_system || '',
     cfg.userLocation
   );
   const userPrompt = replacePromptPlaceholders(
-    DEFAULT_PROMPTS.search_openai_with_tools_user || '',
+    prompts.search_openai_with_tools_user || '',
     cfg.userLocation,
     prompt
   );
@@ -247,9 +241,9 @@ const queryOpenAIWithTools = (prompt: string, cfg: GasConfig, label: string): Se
   return parseSerpJson(text || '');
 };
 
-const queryGeminiNoGrounding = (prompt: string, cfg: GasConfig, label: string): SerpResult[] | null => {
+const queryGeminiNoGrounding = (prompt: string, cfg: GasConfig, label: string, prompts: Record<string, string>): SerpResult[] | null => {
   const textPrompt = replacePromptPlaceholders(
-    DEFAULT_PROMPTS.search_gemini_no_grounding || '',
+    prompts.search_gemini_no_grounding || '',
     cfg.userLocation,
     prompt
   );
@@ -267,9 +261,9 @@ const queryGeminiNoGrounding = (prompt: string, cfg: GasConfig, label: string): 
   return parseSerpJson(text || '');
 };
 
-const queryGeminiWithGrounding = (prompt: string, cfg: GasConfig, label: string): SerpResult[] | null => {
+const queryGeminiWithGrounding = (prompt: string, cfg: GasConfig, label: string, prompts: Record<string, string>): SerpResult[] | null => {
   const textPrompt = replacePromptPlaceholders(
-    DEFAULT_PROMPTS.search_gemini_with_grounding || '',
+    prompts.search_gemini_with_grounding || '',
     cfg.userLocation,
     prompt
   );

@@ -1,5 +1,5 @@
 // Generated for Google Apps Script. Source: src/gas | config: geo-visibility-config.toml
-// Build time: Sat Nov 22 2025 16:48:16 GMT+0100 (Central European Standard Time)
+// Build time: Sat Nov 22 2025 16:58:20 GMT+0100 (Central European Standard Time)
 // Paste this file into Apps Script editor (File > New > Script file).
 
 "use strict";
@@ -203,7 +203,7 @@ Output: "Hey, I am from {location} and I want to know: What's the weather foreca
   });
 
   // src/gas/sheet-utils.ts
-  var SHEETS, OUTPUT_HEADERS, APP_GSC_HEADERS, APP_METRIC_HEADERS, ensureSheets, resetSettingsSheet, readSettings, writeLog, normalizeOutputRow, buildEmptyRow, writeRow, setRowStatus, findDataSheet, findQueryColumn, seedResultsFromQueries, ensureConfigReady, getLanguageOptions, getCountryOptions, validateConfig, cityFromLocation;
+  var SHEETS, OUTPUT_HEADERS, APP_GSC_HEADERS, APP_METRIC_HEADERS, ensureSheets, resetSettingsSheet, resetPromptsSheet, readSettings, readPrompts, writeLog, normalizeOutputRow, buildEmptyRow, writeRow, setRowStatus, findDataSheet, findQueryColumn, seedResultsFromQueries, ensureConfigReady, getLanguageOptions, getCountryOptions, validateConfig, cityFromLocation;
   var init_sheet_utils = __esm({
     "src/gas/sheet-utils.ts"() {
       "use strict";
@@ -214,7 +214,8 @@ Output: "Hey, I am from {location} and I want to know: What's the weather foreca
         QUERIES: "Queries",
         RESULTS: "Results",
         SETTINGS: "Settings",
-        LOGS: "Logs"
+        LOGS: "Logs",
+        PROMPTS: "Prompts"
       };
       OUTPUT_HEADERS = [
         "Original Query",
@@ -265,6 +266,12 @@ Output: "Hey, I am from {location} and I want to know: What's the weather foreca
         if (logs.getLastRow() === 0) {
           logs.getRange(1, 1, 1, 3).setValues([["Timestamp", "Level", "Message"]]);
         }
+        const prompts = ss.getSheetByName(SHEETS.PROMPTS);
+        if (prompts.getLastRow() === 0) {
+          prompts.getRange(1, 1, 1, 3).setValues([["Key", "Prompt", "Notes"]]);
+          const rows = Object.entries(DEFAULT_PROMPTS).map(([k, v]) => [k, v, "Edit to override default prompt"]);
+          prompts.getRange(2, 1, rows.length, 3).setValues(rows);
+        }
       };
       resetSettingsSheet = () => {
         const ss = SpreadsheetApp.getActive();
@@ -282,6 +289,14 @@ Output: "Hey, I am from {location} and I want to know: What's the weather foreca
           ["RATE_LIMIT_MS", 500, "Delay between rows"]
         ];
         settings.getRange(2, 1, rows.length, 3).setValues(rows);
+      };
+      resetPromptsSheet = () => {
+        const ss = SpreadsheetApp.getActive();
+        const prompts = ss.getSheetByName(SHEETS.PROMPTS);
+        prompts.clear();
+        prompts.getRange(1, 1, 1, 3).setValues([["Key", "Prompt", "Notes"]]);
+        const rows = Object.entries(DEFAULT_PROMPTS).map(([k, v]) => [k, v, "Edit to override default prompt"]);
+        prompts.getRange(2, 1, rows.length, 3).setValues(rows);
       };
       readSettings = () => {
         const ss = SpreadsheetApp.getActive();
@@ -304,6 +319,18 @@ Output: "Hey, I am from {location} and I want to know: What's the weather foreca
           batchSize: Number(map.get("BATCH_SIZE") || 5),
           rateLimitMs: Number(map.get("RATE_LIMIT_MS") || 500)
         };
+      };
+      readPrompts = () => {
+        const ss = SpreadsheetApp.getActive();
+        const promptsSheet = ss.getSheetByName(SHEETS.PROMPTS);
+        if (!promptsSheet) return { ...DEFAULT_PROMPTS };
+        const rows = promptsSheet.getRange(2, 1, Math.max(promptsSheet.getLastRow() - 1, 0), 2).getValues();
+        const map = { ...DEFAULT_PROMPTS };
+        rows.forEach(([k, v]) => {
+          if (!k) return;
+          map[String(k).trim()] = typeof v === "string" ? v : String(v || "");
+        });
+        return map;
       };
       writeLog = (level, message) => {
         const sheet = SpreadsheetApp.getActive().getSheetByName(SHEETS.LOGS);
@@ -525,7 +552,6 @@ Output: "Hey, I am from {location} and I want to know: What's the weather foreca
   var init_pipeline = __esm({
     "src/gas/pipeline.ts"() {
       "use strict";
-      init_config();
       init_constants();
       init_utils();
       init_sheet_utils();
@@ -551,6 +577,7 @@ Output: "Hey, I am from {location} and I want to know: What's the weather foreca
       processBatch = (cfg, shouldCancel) => {
         const ss = SpreadsheetApp.getActive();
         const rSheet = ss.getSheetByName(SHEETS.RESULTS);
+        const prompts = readPrompts();
         const data = rSheet.getRange(2, 1, rSheet.getLastRow() - 1, OUTPUT_HEADERS.length).getValues();
         const pending = data.map((row, idx) => ({ row, idx })).filter(({ row }) => !row[2] || row[2] === RESULT_STATUS.ERROR).slice(0, cfg.batchSize);
         let done = 0;
@@ -564,6 +591,7 @@ Output: "Hey, I am from {location} and I want to know: What's the weather foreca
               String(query),
               cfg,
               idx + 2,
+              prompts,
               (state) => writeRow(rSheet, idx + 2, buildRowValues(query, state))
             );
             writeRow(rSheet, idx + 2, buildRowValues(query, processed));
@@ -614,37 +642,37 @@ Output: "Hey, I am from {location} and I want to know: What's the weather foreca
         gemNoAll: "",
         gemWebAll: ""
       });
-      processRow = (query, cfg, rowIndex, onPartial) => {
+      processRow = (query, cfg, rowIndex, prompts, onPartial) => {
         const target = normalizeDomain(cfg.targetDomain);
         const state = blankState();
         const update = (patch) => {
           Object.assign(state, patch);
           onPartial?.({ ...state });
         };
-        const persona = generatePersona(query, cfg);
+        const persona = generatePersona(query, cfg, prompts);
         writeLog("INFO", `Persona generated for "${query}" [row ${rowIndex}]: ${persona}`);
         update({ personaPrompt: persona, checkStatus: "processing" });
-        const gptNo = queryOpenAINoTools(persona, cfg, query);
+        const gptNo = queryOpenAINoTools(persona, cfg, query, prompts);
         update({
           gptNoAll: serializeResults(gptNo),
           gptRank: findRank(gptNo, target).rank,
           gptUrl: findRank(gptNo, target).url
         });
-        const gptWeb = queryOpenAIWithTools(persona, cfg, query);
+        const gptWeb = queryOpenAIWithTools(persona, cfg, query, prompts);
         const rWeb = findRank(gptWeb, target);
         update({
           gptWebAll: serializeResults(gptWeb),
           gptRankWeb: rWeb.rank,
           gptUrlWeb: rWeb.url
         });
-        const gemNo = queryGeminiNoGrounding(persona, cfg, query);
+        const gemNo = queryGeminiNoGrounding(persona, cfg, query, prompts);
         const rGemNo = findRank(gemNo, target);
         update({
           gemNoAll: serializeResults(gemNo),
           gemRank: rGemNo.rank,
           gemUrl: rGemNo.url
         });
-        const gemWeb = queryGeminiWithGrounding(persona, cfg, query);
+        const gemWeb = queryGeminiWithGrounding(persona, cfg, query, prompts);
         const rGemWeb = findRank(gemWeb, target);
         update({
           gemWebAll: serializeResults(gemWeb),
@@ -666,9 +694,9 @@ Output: "Hey, I am from {location} and I want to know: What's the weather foreca
         update({ status, checkStatus: "done" });
         return { ...state };
       };
-      generatePersona = (keyword, cfg) => {
+      generatePersona = (keyword, cfg, prompts) => {
         const systemPrompt = replacePromptPlaceholders(
-          DEFAULT_PROMPTS.persona_system || "",
+          prompts.persona_system || "",
           cfg.userLocation
         );
         const system = `${systemPrompt}
@@ -681,13 +709,13 @@ IMPORTANT: You MUST return the result in the language code: ${cfg.language.toUpp
         if (!resp) throw new Error("Persona generation failed");
         return resp;
       };
-      queryOpenAINoTools = (prompt, cfg, label) => {
+      queryOpenAINoTools = (prompt, cfg, label, prompts) => {
         const systemPrompt = replacePromptPlaceholders(
-          DEFAULT_PROMPTS.search_openai_no_tools_system || "",
+          prompts.search_openai_no_tools_system || "",
           cfg.userLocation
         );
         const userPrompt = replacePromptPlaceholders(
-          DEFAULT_PROMPTS.search_openai_no_tools_user || "",
+          prompts.search_openai_no_tools_user || "",
           cfg.userLocation,
           prompt
         );
@@ -698,13 +726,13 @@ IMPORTANT: You MUST return the result in the language code: ${cfg.language.toUpp
         const content = callOpenAIChat(cfg.openaiKey, cfg.modelOpenai, messages, `OpenAI NoTools for "${label}"`);
         return parseSerpJson(content || "");
       };
-      queryOpenAIWithTools = (prompt, cfg, label) => {
+      queryOpenAIWithTools = (prompt, cfg, label, prompts) => {
         const systemPrompt = replacePromptPlaceholders(
-          DEFAULT_PROMPTS.search_openai_with_tools_system || "",
+          prompts.search_openai_with_tools_system || "",
           cfg.userLocation
         );
         const userPrompt = replacePromptPlaceholders(
-          DEFAULT_PROMPTS.search_openai_with_tools_user || "",
+          prompts.search_openai_with_tools_user || "",
           cfg.userLocation,
           prompt
         );
@@ -728,9 +756,9 @@ ${userPrompt}`,
         const text = extractOpenAIResponseText(resp);
         return parseSerpJson(text || "");
       };
-      queryGeminiNoGrounding = (prompt, cfg, label) => {
+      queryGeminiNoGrounding = (prompt, cfg, label, prompts) => {
         const textPrompt = replacePromptPlaceholders(
-          DEFAULT_PROMPTS.search_gemini_no_grounding || "",
+          prompts.search_gemini_no_grounding || "",
           cfg.userLocation,
           prompt
         );
@@ -747,9 +775,9 @@ ${userPrompt}`,
         const text = extractTextFromGemini(resp);
         return parseSerpJson(text || "");
       };
-      queryGeminiWithGrounding = (prompt, cfg, label) => {
+      queryGeminiWithGrounding = (prompt, cfg, label, prompts) => {
         const textPrompt = replacePromptPlaceholders(
-          DEFAULT_PROMPTS.search_gemini_with_grounding || "",
+          prompts.search_gemini_with_grounding || "",
           cfg.userLocation,
           prompt
         );
@@ -988,12 +1016,13 @@ ${userPrompt}`,
           PropertiesService.getScriptProperties().deleteProperty("RUN_CANCEL");
           let done = 0;
           let errors = 0;
+          const prompts = readPrompts();
           errorRows.forEach(({ row, idx }) => {
             if (shouldCancel()) throw new Error("Run cancelled");
             const query = row[0];
             try {
               setRowStatus(rSheet, idx + 2, "processing");
-              const processed = processRow(String(query), cfg, idx + 2);
+              const processed = processRow(String(query), cfg, idx + 2, prompts);
               writeRow(rSheet, idx + 2, [
                 query,
                 processed.personaPrompt,
@@ -1081,6 +1110,7 @@ ${userPrompt}`,
         fullRestart();
         clearLogs();
         resetSettingsSheet();
+        resetPromptsSheet();
         writeLog("INFO", "Factory reset (keep keys) executed");
       }
       function factoryResetAll() {
@@ -1090,6 +1120,7 @@ ${userPrompt}`,
         fullRestart();
         clearLogs();
         resetSettingsSheet();
+        resetPromptsSheet();
         const props = PropertiesService.getScriptProperties();
         props.deleteProperty("OPENAI_API_KEY");
         props.deleteProperty("GEMINI_API_KEY");
