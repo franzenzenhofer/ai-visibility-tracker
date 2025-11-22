@@ -144,6 +144,7 @@
 
       <div class="card">
         <button onclick="startProcessing()" id="startBtn" disabled class="btn-success">▶️ Start Processing</button>
+        <button onclick="cancelProcessing()" id="cancelBtn" class="hidden" style="background: #d32f2f; margin-left: 0.5rem;">⛔ Cancel</button>
         <div id="progressSection" class="progress hidden">
           <div class="progress-bar">
             <div class="progress-fill" id="progressFill"></div>
@@ -186,8 +187,12 @@
     <div id="resultsTable" class="hidden">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
         <h2 style="margin: 0;">📊 Results Table (CLI Format) - <span id="tableRowCount">0 rows</span></h2>
-        <div>
-          <button onclick="copyAsCSV()" style="margin-right: 0.5rem; padding: 0.5rem 1rem; background: #0e639c; color: white; border: none; border-radius: 4px; cursor: pointer;">📋 Copy as CSV</button>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <div id="batchControls" class="hidden" style="display: flex; gap: 0.5rem; margin-right: 1rem; border-right: 1px solid #3e3e42; padding-right: 1rem;">
+            <button onclick="continueProcessing()" id="continueBtn" style="padding: 0.5rem 1.5rem; background: #107c10; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600;">▶️ Continue (<span id="nextBatchSize">3</span> more)</button>
+            <button onclick="processAllRemaining()" id="doAllBtn" style="padding: 0.4rem 1rem; background: #5a5a5a; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px;">⚡ Do All Remaining (<span id="remainingCount">0</span>)</button>
+          </div>
+          <button onclick="copyAsCSV()" style="padding: 0.5rem 1rem; background: #0e639c; color: white; border: none; border-radius: 4px; cursor: pointer;">📋 Copy as CSV</button>
           <button onclick="copyAsMarkdown()" style="padding: 0.5rem 1rem; background: #0e639c; color: white; border: none; border-radius: 4px; cursor: pointer;">📋 Copy as Markdown</button>
         </div>
       </div>
@@ -248,6 +253,13 @@
 
     let uploadedFile = null;
     let stats = { visible: 0, invisible: 0, errors: 0 };
+
+    // Batch processing state
+    let totalQueries = 0;
+    let processedQueries = 0;
+    let batchSize = 3;
+    let isProcessing = false;
+    let abortController = null;
 
     // Load saved keys and version info
     document.addEventListener('DOMContentLoaded', async () => {
@@ -318,6 +330,11 @@
     async function startProcessing() {
       logger.log('info', '▶️ Starting processing...');
       stats = { visible: 0, invisible: 0, errors: 0 };
+      isProcessing = true;
+      processedQueries = 0;
+
+      // Create AbortController for cancellation
+      abortController = new AbortController();
 
       const formData = new FormData();
       formData.append('file', uploadedFile);
@@ -338,19 +355,27 @@
 
       document.getElementById('progressSection').classList.remove('hidden');
       document.getElementById('startBtn').disabled = true;
+      document.getElementById('cancelBtn').classList.remove('hidden');
+      document.getElementById('batchControls').classList.add('hidden');
       document.getElementById('resultsTable').classList.add('hidden');
       document.getElementById('tablePlaceholder').style.display = 'flex';
       document.getElementById('dataTable').querySelector('tbody').innerHTML = '';
       document.getElementById('tableRowCount').textContent = '0 rows';
 
       try {
-        const res = await fetch('/api/process', { method: 'POST', body: formData });
+        const res = await fetch('/api/process', {
+          method: 'POST',
+          body: formData,
+          signal: abortController.signal
+        });
 
         if (!res.ok) {
           const text = await res.text();
           logger.log('error', `❌ HTTP ${res.status}: ${res.statusText}`, text);
           document.getElementById('progressText').textContent = `Error ${res.status}`;
           document.getElementById('startBtn').disabled = false;
+          document.getElementById('cancelBtn').classList.add('hidden');
+          isProcessing = false;
           return;
         }
 
@@ -385,17 +410,66 @@
 
         logger.log('info', '✅ Processing complete');
         document.getElementById('startBtn').disabled = false;
+        document.getElementById('cancelBtn').classList.add('hidden');
+        isProcessing = false;
       } catch (err) {
-        logger.log('error', '❌ Processing error', err.message);
-        document.getElementById('progressText').textContent = 'Error!';
+        if (err.name === 'AbortError') {
+          logger.log('info', '⛔ Processing cancelled by user');
+          document.getElementById('progressText').textContent = 'Cancelled';
+        } else {
+          logger.log('error', '❌ Processing error', err.message);
+          document.getElementById('progressText').textContent = 'Error!';
+        }
         document.getElementById('startBtn').disabled = false;
+        document.getElementById('cancelBtn').classList.add('hidden');
+        isProcessing = false;
       }
+    }
+
+    function cancelProcessing() {
+      if (abortController && isProcessing) {
+        abortController.abort();
+        logger.log('info', '⛔ Cancelling processing...');
+      }
+    }
+
+    async function continueProcessing() {
+      const currentLimit = parseInt(document.getElementById('queryLimit').value);
+      const newLimit = Math.min(processedQueries + currentLimit, totalQueries);
+
+      logger.log('info', `▶️ Continuing processing: ${processedQueries} → ${newLimit}`);
+
+      // Update limit temporarily
+      const oldLimit = document.getElementById('queryLimit').value;
+      document.getElementById('queryLimit').value = newLimit;
+
+      // Start processing
+      await startProcessing();
+
+      // Restore original batch size
+      document.getElementById('queryLimit').value = oldLimit;
+    }
+
+    async function processAllRemaining() {
+      logger.log('info', `⚡ Processing all remaining queries: ${processedQueries} → ${totalQueries}`);
+
+      // Set limit to total
+      const oldLimit = document.getElementById('queryLimit').value;
+      document.getElementById('queryLimit').value = totalQueries;
+
+      // Start processing
+      await startProcessing();
+
+      // Restore original batch size
+      document.getElementById('queryLimit').value = oldLimit;
     }
 
     function handleSSEEvent(event) {
       if (event.type === 'init') {
-        logger.log('info', `🔢 Total queries: ${event.data.total}`);
-        document.getElementById('progressText').textContent = `0/${event.data.total} queries`;
+        totalQueries = event.data.total;
+        batchSize = parseInt(document.getElementById('queryLimit').value);
+        logger.log('info', `🔢 Total queries: ${totalQueries} (batch: ${batchSize})`);
+        document.getElementById('progressText').textContent = `0/${Math.min(batchSize, totalQueries)} queries (batch 1)`;
       }
 
       if (event.type === 'query_start') {
@@ -430,6 +504,9 @@
       if (event.type === 'query_complete') {
         const result = event.data;
         logger.log('info', `✅ Query complete: ${result.status}`, result);
+
+        // Track processed count
+        processedQueries++;
 
         // Update stats
         if (result.status === 'VISIBLE') stats.visible++;
@@ -475,7 +552,24 @@
 
       if (event.type === 'complete') {
         logger.log('info', '🎉 All queries processed', event.data);
-        document.getElementById('progressText').textContent = 'Complete!';
+        const currentLimit = parseInt(document.getElementById('queryLimit').value);
+
+        // Show batch controls if there are more queries to process
+        if (processedQueries < totalQueries) {
+          const remaining = totalQueries - processedQueries;
+          const nextBatch = Math.min(currentLimit, remaining);
+
+          document.getElementById('nextBatchSize').textContent = nextBatch;
+          document.getElementById('remainingCount').textContent = remaining;
+          document.getElementById('batchControls').classList.remove('hidden');
+
+          document.getElementById('progressText').textContent =
+            `Batch complete! ${remaining} queries remaining`;
+          logger.log('info', `📊 Batch complete: ${processedQueries}/${totalQueries} processed, ${remaining} remaining`);
+        } else {
+          document.getElementById('progressText').textContent = 'All queries complete!';
+          document.getElementById('batchControls').classList.add('hidden');
+        }
       }
 
       if (event.type === 'error') {

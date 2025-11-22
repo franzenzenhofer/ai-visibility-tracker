@@ -33,7 +33,7 @@ export default {
     if (url.pathname === '/api/export') return handleExport(req);
     if (url.pathname === '/api/version') {
       return new Response(JSON.stringify({
-        version: '2.2.0',
+        version: '2.3.0',
         deployedAt: new Date().toISOString(),
       }), {
         headers: { 'Content-Type': 'application/json' },
