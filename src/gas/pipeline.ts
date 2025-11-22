@@ -1,10 +1,8 @@
-import { RESULT_STATUS, PROCESSING_CONSTANTS, LOCATION_CONFIG, ResultStatus } from '../constants';
-import {
-  parseSerpJson,
-  replacePromptPlaceholders,
-  extractGeminiGroundingUrls,
-  normalizeDomain,
-} from '../utils';
+import { RESULT_STATUS, LOCATION_CONFIG, ResultStatus } from '../constants';
+import { parseSerpJson } from '../serp-utils';
+import { replacePromptPlaceholders } from '../prompt-utils';
+import { extractGeminiGroundingUrls } from '../gemini-utils';
+import { normalizeDomain } from '../domain-utils';
 import { GasConfig, ProcessedRow, SerpResult } from './models';
 import { writeRow, setRowStatus, writeLog, OUTPUT_HEADERS, SHEETS, cityFromLocation, readPrompts } from './sheet-utils';
 
@@ -380,7 +378,7 @@ const stringifySafe = (value: unknown, maxLen = 1500): string => {
   try {
     const json = JSON.stringify(value);
     return json.length > maxLen ? `${json.slice(0, maxLen)}... (truncated)` : json;
-  } catch (e) {
+  } catch {
     return String(value);
   }
 };

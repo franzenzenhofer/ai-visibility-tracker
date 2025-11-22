@@ -12,7 +12,7 @@ import {
 } from './types';
 import { OpenAIClient } from './openai-client';
 import { GeminiClient } from './gemini-client';
-import { sleep } from './utils';
+import { sleep } from './prompt-utils';
 import { PROCESSING_CONSTANTS, RESULT_STATUS, ResultStatus } from './constants';
 
 export class VisibilityProcessor {

@@ -2,7 +2,10 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.processRow = exports.processBatch = exports.buildRowValues = void 0;
 const constants_1 = require("../constants");
-const utils_1 = require("../utils");
+const serp_utils_1 = require("../serp-utils");
+const prompt_utils_1 = require("../prompt-utils");
+const gemini_utils_1 = require("../gemini-utils");
+const domain_utils_1 = require("../domain-utils");
 const sheet_utils_1 = require("./sheet-utils");
 const buildRowValues = (query, state) => [
     query,
@@ -95,7 +98,7 @@ const blankState = () => ({
     gemWebAll: '',
 });
 const processRow = (query, cfg, rowIndex, prompts, onPartial) => {
-    const target = (0, utils_1.normalizeDomain)(cfg.targetDomain);
+    const target = (0, domain_utils_1.normalizeDomain)(cfg.targetDomain);
     const state = blankState();
     const update = (patch) => {
         Object.assign(state, patch);
@@ -149,7 +152,7 @@ const processRow = (query, cfg, rowIndex, prompts, onPartial) => {
 };
 exports.processRow = processRow;
 const generatePersona = (keyword, cfg, prompts) => {
-    const systemPrompt = (0, utils_1.replacePromptPlaceholders)(prompts.persona_system || '', cfg.userLocation);
+    const systemPrompt = (0, prompt_utils_1.replacePromptPlaceholders)(prompts.persona_system || '', cfg.userLocation);
     const system = `${systemPrompt}\nIMPORTANT: You MUST return the result in the language code: ${cfg.language.toUpperCase()}`;
     const messages = [
         { role: 'system', content: system },
@@ -161,18 +164,18 @@ const generatePersona = (keyword, cfg, prompts) => {
     return resp;
 };
 const queryOpenAINoTools = (prompt, cfg, label, prompts) => {
-    const systemPrompt = (0, utils_1.replacePromptPlaceholders)(prompts.search_openai_no_tools_system || '', cfg.userLocation);
-    const userPrompt = (0, utils_1.replacePromptPlaceholders)(prompts.search_openai_no_tools_user || '', cfg.userLocation, prompt);
+    const systemPrompt = (0, prompt_utils_1.replacePromptPlaceholders)(prompts.search_openai_no_tools_system || '', cfg.userLocation);
+    const userPrompt = (0, prompt_utils_1.replacePromptPlaceholders)(prompts.search_openai_no_tools_user || '', cfg.userLocation, prompt);
     const messages = [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
     ];
     const content = callOpenAIChat(cfg.openaiKey, cfg.modelOpenai, messages, `OpenAI NoTools for "${label}"`);
-    return (0, utils_1.parseSerpJson)(content || '');
+    return (0, serp_utils_1.parseSerpJson)(content || '');
 };
 const queryOpenAIWithTools = (prompt, cfg, label, prompts) => {
-    const systemPrompt = (0, utils_1.replacePromptPlaceholders)(prompts.search_openai_with_tools_system || '', cfg.userLocation);
-    const userPrompt = (0, utils_1.replacePromptPlaceholders)(prompts.search_openai_with_tools_user || '', cfg.userLocation, prompt);
+    const systemPrompt = (0, prompt_utils_1.replacePromptPlaceholders)(prompts.search_openai_with_tools_system || '', cfg.userLocation);
+    const userPrompt = (0, prompt_utils_1.replacePromptPlaceholders)(prompts.search_openai_with_tools_user || '', cfg.userLocation, prompt);
     const body = {
         model: cfg.modelOpenai,
         input: `${systemPrompt}\n\n${userPrompt}`,
@@ -189,10 +192,10 @@ const queryOpenAIWithTools = (prompt, cfg, label, prompts) => {
     };
     const resp = callOpenAIResponse(cfg.openaiKey, body, `OpenAI WithTools for "${label}"`);
     const text = extractOpenAIResponseText(resp);
-    return (0, utils_1.parseSerpJson)(text || '');
+    return (0, serp_utils_1.parseSerpJson)(text || '');
 };
 const queryGeminiNoGrounding = (prompt, cfg, label, prompts) => {
-    const textPrompt = (0, utils_1.replacePromptPlaceholders)(prompts.search_gemini_no_grounding || '', cfg.userLocation, prompt);
+    const textPrompt = (0, prompt_utils_1.replacePromptPlaceholders)(prompts.search_gemini_no_grounding || '', cfg.userLocation, prompt);
     const body = {
         contents: [
             {
@@ -204,10 +207,10 @@ const queryGeminiNoGrounding = (prompt, cfg, label, prompts) => {
     };
     const resp = callGemini(cfg.geminiKey, cfg.modelGemini, body, `Gemini NoGrounding for "${label}"`);
     const text = extractTextFromGemini(resp);
-    return (0, utils_1.parseSerpJson)(text || '');
+    return (0, serp_utils_1.parseSerpJson)(text || '');
 };
 const queryGeminiWithGrounding = (prompt, cfg, label, prompts) => {
-    const textPrompt = (0, utils_1.replacePromptPlaceholders)(prompts.search_gemini_with_grounding || '', cfg.userLocation, prompt);
+    const textPrompt = (0, prompt_utils_1.replacePromptPlaceholders)(prompts.search_gemini_with_grounding || '', cfg.userLocation, prompt);
     const body = {
         contents: [
             {
@@ -219,11 +222,11 @@ const queryGeminiWithGrounding = (prompt, cfg, label, prompts) => {
         generationConfig: { temperature: 0.2 },
     };
     const resp = callGemini(cfg.geminiKey, cfg.modelGemini, body, `Gemini WithGrounding for "${label}"`);
-    const grounding = (0, utils_1.extractGeminiGroundingUrls)(resp);
+    const grounding = (0, gemini_utils_1.extractGeminiGroundingUrls)(resp);
     if (grounding && grounding.length)
         return grounding;
     const text = extractTextFromGemini(resp);
-    return (0, utils_1.parseSerpJson)(text || '');
+    return (0, serp_utils_1.parseSerpJson)(text || '');
 };
 const callOpenAIChat = (apiKey, model, messages, label) => {
     const payload = { model, messages };
@@ -307,7 +310,7 @@ const stringifySafe = (value, maxLen = 1500) => {
         const json = JSON.stringify(value);
         return json.length > maxLen ? `${json.slice(0, maxLen)}... (truncated)` : json;
     }
-    catch (e) {
+    catch {
         return String(value);
     }
 };

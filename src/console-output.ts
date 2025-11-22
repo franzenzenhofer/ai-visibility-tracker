@@ -1,90 +1,10 @@
 /**
- * Output writer for results
+ * Console output utilities with colors
  */
 
-import * as XLSX from 'xlsx';
-import * as fs from 'fs';
-import * as path from 'path';
-import { ProcessedResult, SerpResult } from './types';
 import chalk from 'chalk';
-import { OUTPUT_HEADERS, RESULT_STATUS } from './constants';
-
-/**
- * Convert processed results to row array format
- *
- * @param results - Array of processed results
- * @returns Array of row arrays (header + data rows)
- */
-const convertResultsToRows = (
-  results: ProcessedResult[]
-): Array<Array<string>> => {
-  const rows: Array<Array<string>> = [[...OUTPUT_HEADERS] as Array<string>];
-
-  results.forEach(result => {
-    rows.push([
-      result.originalQuery,
-      result.personaPrompt,
-      result.status.toUpperCase(),
-      String(result.gptRank),
-      result.gptUrl,
-      String(result.gptRankWeb),
-      result.gptUrlWeb,
-      String(result.gemRank),
-      result.gemUrl,
-      String(result.gemRankWeb),
-      result.gemUrlWeb,
-    ]);
-  });
-
-  return rows;
-};
-
-/**
- * Write results to CSV file
- *
- * @param results - Array of processed results
- * @param outputPath - File path to write CSV
- */
-export const writeResultsToCSV = (
-  results: ProcessedResult[],
-  outputPath: string
-): void => {
-  const rows = convertResultsToRows(results);
-
-  // Convert to CSV with quoted cells
-  const csv = rows
-    .map(row => row.map(cell => `"${cell}"`).join(','))
-    .join('\n');
-
-  fs.writeFileSync(outputPath, csv, 'utf-8');
-};
-
-/**
- * Write results to Excel file
- *
- * @param results - Array of processed results
- * @param outputPath - File path to write Excel
- */
-export const writeResultsToExcel = (
-  results: ProcessedResult[],
-  outputPath: string
-): void => {
-  const rows = convertResultsToRows(results);
-
-  const worksheet = XLSX.utils.aoa_to_sheet(rows);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Results');
-
-  XLSX.writeFile(workbook, outputPath);
-};
-
-/**
- * Generate output filename with timestamp
- */
-export const generateOutputFilename = (format: 'csv' | 'xlsx'): string => {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  return `results_${timestamp}.${format}`;
-};
+import { ProcessedResult, SerpResult } from './types';
+import { RESULT_STATUS } from './constants';
 
 /**
  * Format SerpResult array for console output with colors
@@ -207,39 +127,4 @@ export const displayResultsToConsole = (
 
     console.log(chalk.gray('─'.repeat(80)) + '\n');
   });
-};
-
-/**
- * Ensure output directory exists
- */
-const ensureDirectory = (dirPath: string): void => {
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
-  }
-};
-
-/**
- * Save results to file (CSV or Excel) in optional subdirectory
- */
-export const saveResultsToFile = (
-  results: ProcessedResult[],
-  format: 'csv' | 'xlsx',
-  outputDir?: string
-): string => {
-  const filename = generateOutputFilename(format);
-  const filepath = outputDir ? path.join(outputDir, filename) : filename;
-
-  // Ensure directory exists
-  if (outputDir) {
-    ensureDirectory(outputDir);
-  }
-
-  // Write file
-  if (format === 'csv') {
-    writeResultsToCSV(results, filepath);
-  } else {
-    writeResultsToExcel(results, filepath);
-  }
-
-  return filepath;
 };
