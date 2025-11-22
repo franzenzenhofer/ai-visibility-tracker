@@ -46,3 +46,10 @@ sampledata/
 *.swp
 *.swo
 *~
+
+# CLAUDE.md files (contain sensitive credentials)
+CLAUDE.md
+**/CLAUDE.md
+
+# Other sensitive markdown files
+deleted-file.md
