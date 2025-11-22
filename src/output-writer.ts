@@ -141,10 +141,12 @@ const getStatusText = (status: string): string => {
  *
  * @param results - Array of processed results
  * @param targetDomain - Domain to highlight
+ * @param debugMode - Show all 4 variants (default: false)
  */
 export const displayResultsToConsole = (
   results: ProcessedResult[],
-  targetDomain: string
+  targetDomain: string,
+  debugMode: boolean = false
 ): void => {
   console.log('\n' + chalk.bold('═'.repeat(80)));
   console.log(chalk.bold.cyan('📊 AI VISIBILITY RESULTS'));
@@ -159,21 +161,49 @@ export const displayResultsToConsole = (
     const statusText = getStatusText(result.status);
     console.log(`    Status: ${statusText}\n`);
 
-    // GPT without tools
-    console.log(chalk.bold('  🤖 GPT (No Web Search):'));
-    console.log(formatSerpResults(result.gptNoToolResults, targetDomain) + '\n');
+    if (debugMode) {
+      // DEBUG MODE: Show all 4 variants
+      console.log(chalk.bold('  🤖 GPT (No Web Search):'));
+      console.log(formatSerpResults(result.gptNoToolResults, targetDomain) + '\n');
 
-    // GPT with tools
-    console.log(chalk.bold('  🌐 GPT (WITH Web Search):'));
-    console.log(formatSerpResults(result.gptWithToolResults, targetDomain) + '\n');
+      console.log(chalk.bold('  🌐 GPT (WITH Web Search):'));
+      console.log(formatSerpResults(result.gptWithToolResults, targetDomain) + '\n');
 
-    // Gemini without grounding
-    console.log(chalk.bold('  🧠 Gemini (No Grounding):'));
-    console.log(formatSerpResults(result.gemNoGroundingResults, targetDomain) + '\n');
+      console.log(chalk.bold('  🧠 Gemini (No Grounding):'));
+      console.log(formatSerpResults(result.gemNoGroundingResults, targetDomain) + '\n');
 
-    // Gemini with grounding
-    console.log(chalk.bold('  🔍 Gemini (WITH Google Search):'));
-    console.log(formatSerpResults(result.gemWithGroundingResults, targetDomain) + '\n');
+      console.log(chalk.bold('  🔍 Gemini (WITH Google Search):'));
+      console.log(formatSerpResults(result.gemWithGroundingResults, targetDomain) + '\n');
+    } else {
+      // NORMAL MODE: Show summary of where domain was found
+      const foundIn: string[] = [];
+
+      if (result.gptRank !== '-') {
+        foundIn.push(`GPT (rank ${result.gptRank})`);
+      }
+      if (result.gptRankWeb !== '-') {
+        foundIn.push(`GPT+Web (rank ${result.gptRankWeb})`);
+      }
+      if (result.gemRank !== '-') {
+        foundIn.push(`Gemini (rank ${result.gemRank})`);
+      }
+      if (result.gemRankWeb !== '-') {
+        foundIn.push(`Gemini+Search (rank ${result.gemRankWeb})`);
+      }
+
+      if (foundIn.length > 0) {
+        console.log(chalk.green(`  ✓ Found in: ${foundIn.join(', ')}`));
+        // Show the best ranking URL
+        const bestUrl = result.gptUrl !== '-' ? result.gptUrl :
+                       result.gptUrlWeb !== '-' ? result.gptUrlWeb :
+                       result.gemUrl !== '-' ? result.gemUrl : result.gemUrlWeb;
+        console.log(chalk.gray(`  → ${bestUrl}`));
+      } else {
+        console.log(chalk.gray('  ✗ Not found in any variant'));
+        console.log(chalk.gray('  → Use --debug to see all search results'));
+      }
+      console.log();
+    }
 
     console.log(chalk.gray('─'.repeat(80)) + '\n');
   });

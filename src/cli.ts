@@ -136,7 +136,7 @@ program
       console.log(`   ⛔ Errors: ${stats.errors}\n`);
 
       // Display results to console (always)
-      displayResultsToConsole(results, config.TARGET_DOMAIN);
+      displayResultsToConsole(results, config.TARGET_DOMAIN, options.debug);
 
       // Display summary
       console.log('\n' + '═'.repeat(80));
