@@ -12,9 +12,9 @@ routes = [
   { pattern = "ai-visibility-by-gsc-export.franzai.com", custom_domain = true }
 ]
 
-# Static assets configuration
-[site]
-bucket = "workers/static"
+# Static assets configuration (modern format)
+[assets]
+directory = "workers/static"
 
 # Environment variables (non-sensitive)
 [vars]

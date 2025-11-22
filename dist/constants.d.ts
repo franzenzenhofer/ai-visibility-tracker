@@ -64,3 +64,7 @@ export declare const DOMAIN_PREFIXES_TO_REMOVE: readonly ["www."];
  * URL protocols to identify
  */
 export declare const URL_PROTOCOLS: readonly ["http", "www."];
+/**
+ * Google Search Console header variations (multilingual)
+ */
+export declare const GSC_HEADERS: readonly ["Top queries", "Query", "Suchanfrage", "Keyword", "Search term"];

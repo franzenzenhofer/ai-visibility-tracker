@@ -39,7 +39,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.readExcelFile = void 0;
 const XLSX = __importStar(require("xlsx"));
-const config_1 = require("./config");
+const constants_1 = require("./constants");
 const sheet_detector_1 = require("./sheet-detector");
 const readExcelFile = (filePath) => {
     try {
@@ -65,7 +65,7 @@ const readExcelFile = (filePath) => {
         if (!queryColumn) {
             const headers = Object.keys(data[0]);
             throw new Error(`Could not detect query column. Available columns: ${headers.join(', ')}\n` +
-                `Expected patterns: ${config_1.GSC_HEADERS.join(', ')}`);
+                `Expected patterns: ${constants_1.GSC_HEADERS.join(', ')}`);
         }
         console.log(`✅ Using query column: "${queryColumn}"`);
         // Extract queries

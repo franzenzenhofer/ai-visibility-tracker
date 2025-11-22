@@ -36,19 +36,12 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.loadConfig = exports.GSC_HEADERS = void 0;
+exports.loadConfig = void 0;
 const dotenv = __importStar(require("dotenv"));
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const toml = __importStar(require("@iarna/toml"));
 dotenv.config();
-exports.GSC_HEADERS = [
-    'Top queries',
-    'Query',
-    'Suchanfrage',
-    'Keyword',
-    'Search term',
-];
 /**
  * Load configuration from TOML file and .env
  */

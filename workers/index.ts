@@ -31,6 +31,14 @@ export default {
     if (url.pathname === '/api/detect') return handleDetect(req);
     if (url.pathname === '/api/process') return handleProcess(req);
     if (url.pathname === '/api/export') return handleExport(req);
+    if (url.pathname === '/api/version') {
+      return new Response(JSON.stringify({
+        version: '2.2.0',
+        deployedAt: new Date().toISOString(),
+      }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
     // Static files (served by Wrangler's assets)
     if (env.ASSETS) return env.ASSETS.fetch(req);
