@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment variables (contains secrets!)
+.env
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+
+# Output files
+results_*.csv
+results_*.xlsx
+results-output/
+
+# Test files and trash
+trash/
+test*.csv
+*.xlsx
+!sampledata/*.xlsx
+
+# IDE
+.vscode/
+.idea/

@@ -1,0 +1,205 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# AI VISIBILITY TRACKER - MAIN CONFIGURATION FILE
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# This is the main configuration file for the AI Visibility Tracker.
+# API keys are stored separately in .env file (for security).
+#
+# FORMAT: TOML (Tom's Obvious, Minimal Language)
+# Docs: https://toml.io/
+#
+# IMPORTANT:
+# - All settings can be overridden via CLI parameters
+# - Multi-line strings use triple quotes """..."""
+# - {location} placeholder will be replaced with USER_LOCATION
+# - {query} placeholder will be replaced with the actual query
+#
+# CLI PARAMETER OVERRIDES:
+#   -d, --domain <domain>        Override target_domain
+#   -l, --location <location>    Override user_location
+#   -b, --batch <size>           Override batch_size
+#   --model-openai <model>       Override model_openai
+#   --model-gemini <model>       Override model_gemini
+#
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ──────────────────────────────────────────────────────────────────────────────
+# TRACKING SETTINGS
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Target Domain - The domain you want to track in AI search results
+# Format: domain.com (without http:// or www.)
+# Examples: "wien.gv.at", "marktguru.at", "mycompany.com"
+target_domain = "marktguru.at"
+
+# User Location - Geographic context for searches (MOST IMPORTANT!)
+# Format: "City, Country"
+# This is used in ALL prompts to provide local context
+# Examples: "Vienna, Austria", "New York, USA", "London, UK", "Berlin, Germany"
+# Effect: Provides crucial geographic context for local results
+user_location = "Vienna, Austria"
+
+# Language - Language for persona prompts and responses
+# Format: ISO 639-1 two-letter code
+# Examples: "en" (English), "de" (German), "es" (Spanish), "fr" (French), "it" (Italian)
+# Effect: Determines the language used in persona generation prompts
+# The model will be explicitly instructed to return results in this language
+language = "en"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# PROCESSING SETTINGS
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Batch Size - Number of queries to process in parallel
+# Lower = slower but more stable | Higher = faster but may hit rate limits
+# Recommended: 2-5
+batch_size = 2
+
+# ──────────────────────────────────────────────────────────────────────────────
+# AI MODELS
+# ──────────────────────────────────────────────────────────────────────────────
+
+# OpenAI Model - Which GPT model to use
+# Supported: "gpt-5-mini" (cheapest), "gpt-5", "gpt-5-nano", "o4-mini"
+# MUST support Responses API for web search
+model_openai = "gpt-5-mini"
+
+# Gemini Model - Which Gemini model to use
+# Supported: "gemini-2.5-flash" (recommended), "gemini-1.5-flash"
+# MUST support googleSearch tool for web grounding
+model_gemini = "gemini-2.5-flash"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PROMPTS CONFIGURATION
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# All prompts used by the AI Visibility Tracker are defined below.
+# You can customize these prompts to change the behavior of the tool.
+#
+# PLACEHOLDERS:
+#   {location} - Replaced with user_location
+#   {query}    - Replaced with the actual search query/keyword
+#
+# ══════════════════════════════════════════════════════════════════════════════
+
+[prompts]
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 1. PERSONA GENERATION PROMPT
+# ──────────────────────────────────────────────────────────────────────────────
+# Converts keywords into natural questions with location context
+# Example: "red bull aktion" → "Hey, I am from Vienna, Austria and I want to know: Are there any Red Bull promotions?"
+
+persona_system = """You are helping convert search keywords into natural questions that include geographic context.
+
+Context: The user is from {location}.
+
+Task: Rewrite the given keyword into a natural, conversational question that starts with location context.
+
+Format: "Hey, I am from {location} and I want to know: [natural question based on keyword]"
+
+Rules:
+- Keep the question natural and conversational
+- Include the location context at the beginning
+- Make it sound like something a real person would ask
+- Output ONLY the question string, nothing else
+
+Examples:
+Input: "pizza delivery"
+Output: "Hey, I am from {location} and I want to know: Where can I get pizza delivered tonight?"
+
+Input: "best restaurants"
+Output: "Hey, I am from {location} and I want to know: What are the best restaurants near me?"
+
+Input: "weather forecast"
+Output: "Hey, I am from {location} and I want to know: What's the weather forecast for today?"
+"""
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 2. OPENAI SEARCH (WITHOUT TOOLS) - Pure Model Knowledge
+# ──────────────────────────────────────────────────────────────────────────────
+# Tests what GPT knows from training data without web access
+
+search_openai_no_tools_system = """Role: Search Engine.
+Task: Provide top 5 search results based solely on your training data.
+Output: Strict JSON Array in this exact format: [{"rank":1,"domain":"example.com","url":"https://example.com/page"}]
+
+Requirements:
+- Exactly 5 results
+- Results must be from your training knowledge only
+- Include full URLs
+- Return ONLY the JSON array, no other text"""
+
+search_openai_no_tools_user = "Query: {query}"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 3. OPENAI SEARCH (WITH TOOLS) - REAL Web Search via Responses API
+# ──────────────────────────────────────────────────────────────────────────────
+# Uses Responses API with web_search tool for REAL web access
+
+search_openai_with_tools_system = """Role: Search Engine with real-time web capabilities.
+Task: Provide top 5 current, up-to-date search results using your web search capabilities.
+Output: Strict JSON Array in this exact format: [{"rank":1,"domain":"example.com","url":"https://example.com/page"}]
+
+Requirements:
+- Use your web search tool to find CURRENT results
+- Exactly 5 results
+- Include full, specific URLs (not generic homepages)
+- Return ONLY the JSON array, no other text"""
+
+search_openai_with_tools_user = "Search query: {query}"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 4. GEMINI SEARCH (WITHOUT GROUNDING) - Pure Model Knowledge
+# ──────────────────────────────────────────────────────────────────────────────
+# Tests what Gemini knows from training data without Google Search
+
+search_gemini_no_grounding = """Query: "{query}".
+
+Provide top 5 search results based solely on your training knowledge.
+Return results as strict JSON in this exact format: [{"rank":1,"domain":"example.com","url":"https://example.com/page"}]
+
+Requirements:
+- Exactly 5 results
+- Results must be from your training knowledge only
+- Include full URLs
+- Return ONLY the JSON array, no other text"""
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 5. GEMINI SEARCH (WITH GROUNDING) - REAL Web Search via Google Search
+# ──────────────────────────────────────────────────────────────────────────────
+# Uses googleSearch grounding tool for REAL Google Search results
+
+search_gemini_with_grounding = """Query: "{query}".
+
+Use Google Search to provide top 5 current search results.
+Return results as strict JSON in this exact format: [{"rank":1,"domain":"example.com","url":"https://example.com/page"}]
+
+Requirements:
+- Use Google Search grounding to find CURRENT results
+- Exactly 5 results
+- Include full, specific URLs (not generic homepages)
+- Return ONLY the JSON array, no other text"""
+
+# ══════════════════════════════════════════════════════════════════════════════
+# END OF CONFIGURATION
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# USAGE EXAMPLES:
+#
+# Basic usage (uses settings from this file):
+#   npm run dev -- process data.xlsx
+#
+# Override location:
+#   npm run dev -- process data.xlsx -l "Berlin, Germany"
+#
+# Override domain and save to directory:
+#   npm run dev -- process data.xlsx -d mysite.com -o results/
+#
+# Use different models:
+#   npm run dev -- process data.xlsx --model-openai gpt-5 --model-gemini gemini-1.5-flash
+#
+# Full debug mode:
+#   npm run dev -- process data.xlsx --debug
+#
+# ══════════════════════════════════════════════════════════════════════════════
