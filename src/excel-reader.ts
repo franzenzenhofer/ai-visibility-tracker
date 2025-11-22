@@ -6,36 +6,39 @@
 import * as XLSX from 'xlsx';
 import { QueryRow } from './types';
 import { GSC_HEADERS } from './config';
+import { isQueryLike } from './utils';
+import { PROCESSING_CONSTANTS } from './constants';
 
 /**
  * Check if a column contains query-like data
+ *
+ * @param data - Array of row data
+ * @param columnName - Column name to check
+ * @returns True if column appears to contain search queries
  */
-const isQueryColumn = (data: Record<string, unknown>[], columnName: string): boolean => {
-  // Check first 10 rows for query-like patterns
-  const samplesToCheck = Math.min(10, data.length);
+const isQueryColumn = (
+  data: Record<string, unknown>[],
+  columnName: string
+): boolean => {
+  const samplesToCheck = Math.min(
+    PROCESSING_CONSTANTS.QUERY_DETECTION_SAMPLE_SIZE,
+    data.length
+  );
   let queryLikeCount = 0;
 
   for (let i = 0; i < samplesToCheck; i++) {
     const value = String(data[i][columnName] || '').trim();
 
-    // Query characteristics:
-    // - Contains text (not just numbers)
-    // - Length between 2-200 characters
-    // - Contains letters
-    // - Not a URL
-    if (
-      value.length >= 2 &&
-      value.length <= 200 &&
-      /[a-zA-ZäöüßÄÖÜàáâãåèéêëìíîïòóôõùúûýÿčćđšžÀÁÂÃÅÈÉÊËÌÍÎÏÒÓÔÕÙÚÛÝŸČĆĐŠŽ]/.test(value) &&
-      !value.startsWith('http') &&
-      !value.startsWith('www.')
-    ) {
+    if (isQueryLike(value)) {
       queryLikeCount++;
     }
   }
 
-  // If more than 70% of samples look like queries, it's probably the query column
-  return queryLikeCount / samplesToCheck > 0.7;
+  // If more than threshold of samples look like queries, it's the query column
+  return (
+    queryLikeCount / samplesToCheck >
+    PROCESSING_CONSTANTS.QUERY_DETECTION_THRESHOLD
+  );
 };
 
 /**

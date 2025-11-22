@@ -2,6 +2,8 @@
  * Type definitions for AI Visibility Tracker
  */
 
+import { ResultStatus } from './constants';
+
 export interface Config {
   OPENAI_API_KEY: string;
   GEMINI_API_KEY: string;
@@ -22,7 +24,6 @@ export interface Config {
   };
 }
 
-
 export interface QueryRow {
   query: string;
   rowIndex: number;
@@ -32,7 +33,7 @@ export interface QueryRow {
 export interface ProcessedResult {
   originalQuery: string;
   personaPrompt: string;
-  status: 'visible' | 'invisible' | 'tool-only' | 'error';
+  status: ResultStatus;
   // Store all results from each variant
   gptNoToolResults: SerpResult[];
   gptWithToolResults: SerpResult[];

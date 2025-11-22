@@ -7,26 +7,18 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ProcessedResult, SerpResult } from './types';
 import chalk from 'chalk';
+import { OUTPUT_HEADERS, RESULT_STATUS } from './constants';
 
 /**
- * Write results to CSV file
+ * Convert processed results to row array format
+ *
+ * @param results - Array of processed results
+ * @returns Array of row arrays (header + data rows)
  */
-export const writeResultsToCSV = (results: ProcessedResult[], outputPath: string): void => {
-  const rows = [
-    [
-      'Original Query',
-      'Persona Prompt',
-      'Status',
-      'GPT Rank',
-      'GPT URL',
-      'GPT Rank (Web)',
-      'GPT URL (Web)',
-      'Gemini Rank',
-      'Gemini URL',
-      'Gemini Rank (Web)',
-      'Gemini URL (Web)',
-    ],
-  ];
+const convertResultsToRows = (
+  results: ProcessedResult[]
+): Array<Array<string>> => {
+  const rows: Array<Array<string>> = [[...OUTPUT_HEADERS] as Array<string>];
 
   results.forEach(result => {
     rows.push([
@@ -44,47 +36,40 @@ export const writeResultsToCSV = (results: ProcessedResult[], outputPath: string
     ]);
   });
 
-  // Convert to CSV
-  const csv = rows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+  return rows;
+};
+
+/**
+ * Write results to CSV file
+ *
+ * @param results - Array of processed results
+ * @param outputPath - File path to write CSV
+ */
+export const writeResultsToCSV = (
+  results: ProcessedResult[],
+  outputPath: string
+): void => {
+  const rows = convertResultsToRows(results);
+
+  // Convert to CSV with quoted cells
+  const csv = rows
+    .map(row => row.map(cell => `"${cell}"`).join(','))
+    .join('\n');
 
   fs.writeFileSync(outputPath, csv, 'utf-8');
 };
 
 /**
  * Write results to Excel file
+ *
+ * @param results - Array of processed results
+ * @param outputPath - File path to write Excel
  */
-export const writeResultsToExcel = (results: ProcessedResult[], outputPath: string): void => {
-  const rows = [
-    [
-      'Original Query',
-      'Persona Prompt',
-      'Status',
-      'GPT Rank',
-      'GPT URL',
-      'GPT Rank (Web)',
-      'GPT URL (Web)',
-      'Gemini Rank',
-      'Gemini URL',
-      'Gemini Rank (Web)',
-      'Gemini URL (Web)',
-    ],
-  ];
-
-  results.forEach(result => {
-    rows.push([
-      result.originalQuery,
-      result.personaPrompt,
-      result.status.toUpperCase(),
-      String(result.gptRank),
-      result.gptUrl,
-      String(result.gptRankWeb),
-      result.gptUrlWeb,
-      String(result.gemRank),
-      result.gemUrl,
-      String(result.gemRankWeb),
-      result.gemUrlWeb,
-    ]);
-  });
+export const writeResultsToExcel = (
+  results: ProcessedResult[],
+  outputPath: string
+): void => {
+  const rows = convertResultsToRows(results);
 
   const worksheet = XLSX.utils.aoa_to_sheet(rows);
   const workbook = XLSX.utils.book_new();
@@ -102,18 +87,28 @@ export const generateOutputFilename = (format: 'csv' | 'xlsx'): string => {
 };
 
 /**
- * Format SerpResult array for console output
+ * Format SerpResult array for console output with colors
+ *
+ * @param results - Array of SERP results
+ * @param targetDomain - Domain to highlight
+ * @returns Formatted string with colors
  */
-const formatSerpResults = (results: SerpResult[], targetDomain: string): string => {
+const formatSerpResults = (
+  results: SerpResult[],
+  targetDomain: string
+): string => {
   if (!results || results.length === 0) {
     return chalk.gray('  No results');
   }
 
   return results
     .map(r => {
-      const isTarget = r.domain.includes(targetDomain) || r.url.includes(targetDomain);
+      const isTarget =
+        r.domain.includes(targetDomain) || r.url.includes(targetDomain);
       const rankStr = chalk.cyan(`  ${r.rank}.`);
-      const domainStr = isTarget ? chalk.green.bold(r.domain) : chalk.white(r.domain);
+      const domainStr = isTarget
+        ? chalk.green.bold(r.domain)
+        : chalk.white(r.domain);
       const urlStr = isTarget ? chalk.green(r.url) : chalk.gray(r.url);
       return `${rankStr} ${domainStr}\n     ${urlStr}`;
     })
@@ -121,9 +116,36 @@ const formatSerpResults = (results: SerpResult[], targetDomain: string): string 
 };
 
 /**
- * Display results to console/terminal
+ * Get colored status text for display
+ *
+ * @param status - Result status
+ * @returns Colored status string
  */
-export const displayResultsToConsole = (results: ProcessedResult[], targetDomain: string): void => {
+const getStatusText = (status: string): string => {
+  switch (status) {
+    case RESULT_STATUS.VISIBLE:
+      return chalk.green.bold('✅ VISIBLE');
+    case RESULT_STATUS.TOOL_ONLY:
+      return chalk.yellow.bold('⚠️  TOOL-ONLY');
+    case RESULT_STATUS.INVISIBLE:
+      return chalk.red.bold('❌ INVISIBLE');
+    case RESULT_STATUS.ERROR:
+      return chalk.red.bold('⛔ ERROR');
+    default:
+      return chalk.gray('UNKNOWN');
+  }
+};
+
+/**
+ * Display results to console/terminal with colors
+ *
+ * @param results - Array of processed results
+ * @param targetDomain - Domain to highlight
+ */
+export const displayResultsToConsole = (
+  results: ProcessedResult[],
+  targetDomain: string
+): void => {
   console.log('\n' + chalk.bold('═'.repeat(80)));
   console.log(chalk.bold.cyan('📊 AI VISIBILITY RESULTS'));
   console.log(chalk.bold('═'.repeat(80)) + '\n');
@@ -134,21 +156,7 @@ export const displayResultsToConsole = (results: ProcessedResult[], targetDomain
     console.log(chalk.gray(`    Persona: "${result.personaPrompt}"`));
 
     // Status
-    let statusText = '';
-    switch (result.status) {
-      case 'visible':
-        statusText = chalk.green.bold('✅ VISIBLE');
-        break;
-      case 'tool-only':
-        statusText = chalk.yellow.bold('⚠️  TOOL-ONLY');
-        break;
-      case 'invisible':
-        statusText = chalk.red.bold('❌ INVISIBLE');
-        break;
-      case 'error':
-        statusText = chalk.red.bold('⛔ ERROR');
-        break;
-    }
+    const statusText = getStatusText(result.status);
     console.log(`    Status: ${statusText}\n`);
 
     // GPT without tools

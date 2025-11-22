@@ -5,6 +5,8 @@
 import OpenAI from 'openai';
 import { Config, SerpResult } from './types';
 import { getLogger } from './logger';
+import { replacePromptPlaceholders, parseSerpJson } from './utils';
+import { LOCATION_CONFIG } from './constants';
 
 export class OpenAIClient {
   private client: OpenAI;
@@ -19,26 +21,27 @@ export class OpenAIClient {
   }
 
   /**
-   * Replace placeholders in prompts
-   */
-  private replacePromptPlaceholders(prompt: string, query?: string): string {
-    return prompt
-      .replace(/{location}/g, this.config.USER_LOCATION)
-      .replace(/{query}/g, query || '');
-  }
-
-  /**
    * Generate persona prompt from keyword
+   *
+   * @param keyword - Search keyword to create persona for
+   * @returns Persona prompt or null if generation fails
    */
   async generatePersona(keyword: string): Promise<string | null> {
     try {
-      const systemPrompt = this.replacePromptPlaceholders(this.config.PROMPTS.OPENAI_PERSONA_SYSTEM);
+      const systemPrompt = replacePromptPlaceholders(
+        this.config.PROMPTS.OPENAI_PERSONA_SYSTEM,
+        this.config.USER_LOCATION
+      );
 
       // Add language instruction to the system prompt
       // The LLM understands language codes: en, de, es, fr, etc.
       const systemPromptWithLanguage = `${systemPrompt}\n\nIMPORTANT: You MUST return the result in the language code: ${this.config.LANGUAGE.toUpperCase()}`;
 
-      this.logger.logRequest('OpenAI Persona', this.config.MODEL_OPENAI, `System: ${systemPromptWithLanguage}\nUser: ${keyword}`);
+      this.logger.logRequest(
+        'OpenAI Persona',
+        this.config.MODEL_OPENAI,
+        `System: ${systemPromptWithLanguage}\nUser: ${keyword}`
+      );
 
       const response = await this.client.chat.completions.create({
         model: this.config.MODEL_OPENAI,
@@ -68,14 +71,28 @@ export class OpenAIClient {
   }
 
   /**
-   * Query GPT without search tools
+   * Query GPT without search tools (pure model knowledge)
+   *
+   * @param prompt - User prompt/persona to query
+   * @returns Array of SERP results or null if query fails
    */
   async queryWithoutTools(prompt: string): Promise<SerpResult[] | null> {
     try {
-      const systemPrompt = this.replacePromptPlaceholders(this.config.PROMPTS.OPENAI_SEARCH_NO_TOOLS_SYSTEM);
-      const userPrompt = this.replacePromptPlaceholders(this.config.PROMPTS.OPENAI_SEARCH_NO_TOOLS_USER, prompt);
+      const systemPrompt = replacePromptPlaceholders(
+        this.config.PROMPTS.OPENAI_SEARCH_NO_TOOLS_SYSTEM,
+        this.config.USER_LOCATION
+      );
+      const userPrompt = replacePromptPlaceholders(
+        this.config.PROMPTS.OPENAI_SEARCH_NO_TOOLS_USER,
+        this.config.USER_LOCATION,
+        prompt
+      );
 
-      this.logger.logRequest('OpenAI NoTools', this.config.MODEL_OPENAI, `System: ${systemPrompt}\nUser: ${userPrompt}`);
+      this.logger.logRequest(
+        'OpenAI NoTools',
+        this.config.MODEL_OPENAI,
+        `System: ${systemPrompt}\nUser: ${userPrompt}`
+      );
 
       const response = await this.client.chat.completions.create({
         model: this.config.MODEL_OPENAI,
@@ -95,11 +112,17 @@ export class OpenAIClient {
       this.logger.logRawResponse('OpenAI NoTools', response);
 
       const content = response.choices[0]?.message?.content;
-      this.logger.logResponse('OpenAI NoTools', content ? 'SUCCESS' : 'EMPTY', content);
+      this.logger.logResponse(
+        'OpenAI NoTools',
+        content ? 'SUCCESS' : 'EMPTY',
+        content
+      );
 
-      if (!content) return null;
+      if (!content) {
+        return null;
+      }
 
-      return this.parseSerpJson(content);
+      return parseSerpJson(content);
     } catch (error) {
       this.logger.logError('OpenAI No Tools', error as Error);
       return null;
@@ -109,21 +132,36 @@ export class OpenAIClient {
   /**
    * Query GPT with REAL web search using Responses API
    * Uses web_search tool for actual web searches
+   *
+   * @param prompt - User prompt/persona to query
+   * @returns Array of SERP results or null if query fails
    */
   async queryWithTools(prompt: string): Promise<SerpResult[] | null> {
     try {
-      const systemPrompt = this.replacePromptPlaceholders(this.config.PROMPTS.OPENAI_SEARCH_WITH_TOOLS_SYSTEM);
-      const userPrompt = this.replacePromptPlaceholders(this.config.PROMPTS.OPENAI_SEARCH_WITH_TOOLS_USER, prompt);
+      const systemPrompt = replacePromptPlaceholders(
+        this.config.PROMPTS.OPENAI_SEARCH_WITH_TOOLS_SYSTEM,
+        this.config.USER_LOCATION
+      );
+      const userPrompt = replacePromptPlaceholders(
+        this.config.PROMPTS.OPENAI_SEARCH_WITH_TOOLS_USER,
+        this.config.USER_LOCATION,
+        prompt
+      );
       const inputPrompt = `${systemPrompt}\n\n${userPrompt}`;
 
-      this.logger.logRequest('OpenAI WithTools (Responses API)', this.config.MODEL_OPENAI, inputPrompt, {
-        tool: 'web_search',
-        user_location: this.config.USER_LOCATION,
-      });
+      this.logger.logRequest(
+        'OpenAI WithTools (Responses API)',
+        this.config.MODEL_OPENAI,
+        inputPrompt,
+        {
+          tool: 'web_search',
+          user_location: this.config.USER_LOCATION,
+        }
+      );
 
       // Use Responses API with REAL web search
-      // @ts-ignore - responses API types may not be complete
-      const response = await this.client.responses.create({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const response = await (this.client as any).responses.create({
         model: this.config.MODEL_OPENAI,
         tools: [
           {
@@ -131,7 +169,7 @@ export class OpenAIClient {
             user_location: {
               type: 'approximate',
               city: this.config.USER_LOCATION.split(',')[0].trim(),
-              country: 'AT', // Austria - could be made configurable
+              country: LOCATION_CONFIG.DEFAULT_COUNTRY_CODE,
             },
           },
         ],
@@ -141,61 +179,27 @@ export class OpenAIClient {
       // Log RAW API response for transparency
       this.logger.logRawResponse('OpenAI WithTools (Responses API)', response);
 
-      // @ts-ignore
-      const content = response.output_text || response.output?.[0]?.content?.[0]?.text;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const content = (response as any).output_text || (response as any).output?.[0]?.content?.[0]?.text;
 
-      this.logger.logResponse('OpenAI WithTools (Responses API)', content ? 'SUCCESS' : 'EMPTY', content, {
-        // @ts-ignore
-        sources: response.sources,
-      });
+      this.logger.logResponse(
+        'OpenAI WithTools (Responses API)',
+        content ? 'SUCCESS' : 'EMPTY',
+        content,
+        {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          sources: (response as any).sources,
+        }
+      );
 
-      if (!content) return null;
+      if (!content) {
+        return null;
+      }
 
-      return this.parseSerpJson(content);
+      return parseSerpJson(content);
     } catch (error) {
       this.logger.logError('OpenAI With Tools (Responses API)', error as Error);
       // NO FALLBACK - If web search doesn't work, we fail
-      return null;
-    }
-  }
-
-  /**
-   * Parse SERP JSON from response
-   */
-  private parseSerpJson(text: string): SerpResult[] | null {
-    try {
-      // Extract JSON array from text
-      const match = text.match(/\[\s*\{[\s\S]*?\}\s*\]/);
-      if (!match) return null;
-
-      const arr = JSON.parse(match[0]);
-      if (!Array.isArray(arr)) return null;
-
-      // Normalize keys (handle 'link', 'url', 'href')
-      return arr.map(item => {
-        const url = item.url || item.link || item.href || '';
-        let domain = item.domain || '';
-
-        // Extract domain from URL if not provided
-        if (!domain && url) {
-          try {
-            domain = new URL(url).hostname.toLowerCase();
-          } catch {
-            domain = '';
-          }
-        }
-
-        // Normalize domain (remove www. prefix)
-        domain = domain.replace(/^www\./, '');
-
-        return {
-          rank: item.rank || 0,
-          domain: domain,
-          url: url,
-        };
-      });
-    } catch (error) {
-      console.error('Failed to parse SERP JSON:', error);
       return null;
     }
   }
