@@ -21,6 +21,7 @@ results-output/
 
 # Test files and trash
 trash/
+trash-docs/
 test*.csv
 *.xlsx
 !sampledata/*.xlsx
@@ -28,3 +29,6 @@ test*.csv
 # IDE
 .vscode/
 .idea/
+
+# Claude Code
+.claude/
