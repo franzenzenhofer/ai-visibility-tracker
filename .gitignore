@@ -51,3 +51,8 @@ sampledata/
 
 # Old/temporary files (not for repo)
 deleted-file.md
+
+# Sensitive configuration files
+CLAUDE.md
+.env
+*.pem
